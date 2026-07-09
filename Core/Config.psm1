@@ -8,12 +8,7 @@ function Get-ToolkitConfiguration {
         [string]$ProfileName = "HP_ZBook_Fury_G7.json"
     )
 
-    $root = if ($Global:ToolkitRoot) {
-        $Global:ToolkitRoot
-    } else {
-        Split-Path -Parent $PSScriptRoot
-    }
-
+    $root = Split-Path -Parent $PSScriptRoot
     $profilePath = Join-Path $root "Profiles\$ProfileName"
 
     if (-not (Test-Path $profilePath)) {
