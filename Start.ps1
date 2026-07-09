@@ -15,7 +15,8 @@ function Show-Menu {
     Write-Host "1. System Audit"
     Write-Host "2. Service Analyzer"
     Write-Host "3. Startup Analyzer"
-    Write-Host "4. Exit"
+    Write-Host "4. Installed Software"
+    Write-Host "5. Exit"
     Write-Host ""
 }
 
@@ -37,6 +38,10 @@ do {
             Pause
         }
         "4" {
+            & "$ScriptRoot\Modules\Software.ps1"
+            Pause
+        }
+        "5" {
             Write-Host "Exiting."
             break
         }
@@ -45,4 +50,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "4")
+} while ($choice -ne "5")
