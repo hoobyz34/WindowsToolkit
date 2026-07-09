@@ -1,0 +1,89 @@
+# WindowsToolkit Roadmap
+
+## Vision
+
+WindowsToolkit is a modular Windows auditing and optimization platform focused on:
+
+- Safe analysis before changes
+- Explainable recommendations
+- Rollback capability
+- Vendor-aware recommendations (HP, Intel, NVIDIA, Microsoft, etc.)
+- Health dashboards
+
+---
+
+# Current Version
+
+v0.2.0
+
+---
+
+# Completed
+
+- [x] Git repository
+- [x] VS Code development environment
+- [x] PowerShell 7
+- [x] Modular architecture
+- [x] Audit module
+- [x] Service Analyzer
+- [x] Startup Analyzer
+- [x] Configuration profiles
+- [x] Recommendation engine
+- [x] Data-driven rule files
+
+---
+
+# Current Sprint
+
+## Issue #1
+Refactor Service Analyzer to use Recommendation Engine.
+
+## Issue #2
+Refactor Startup Analyzer to use Recommendation Engine.
+
+## Issue #3
+Create Installed Software Analyzer.
+
+---
+
+# Future Milestones
+
+## Inventory
+
+- Drivers
+- Scheduled Tasks
+- Windows Features
+- Appx Packages
+- Browser Extensions
+
+## Intelligence
+
+- Health Score
+- Recommendation Engine v2
+- Vendor Detection
+- Dependency Analysis
+
+## Reporting
+
+- HTML Dashboard
+- JSON Export
+- Interactive Summary
+
+## Optimization
+
+- Safe Service Changes
+- Startup Optimization
+- Restore Points
+- Rollback
+
+---
+
+# Long-Term Goal
+
+A professional Windows health and optimization toolkit that provides:
+
+- Safe recommendations
+- Detailed reporting
+- Vendor-aware analysis
+- Repeatable audits
+- Extensible architecture
