@@ -61,6 +61,7 @@ function Get-ToolkitRecommendation {
     $specificFile = switch ($Type) {
         "service"  { "Services.json" }
         "software" { "Software.json" }
+        "driver"   { "Drivers.json" }
         default    { "Rules.json" }
     }
 

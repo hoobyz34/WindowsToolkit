@@ -1,0 +1,42 @@
+[
+  {
+    "match": "Microsoft",
+    "vendor": "Microsoft",
+    "category": "Windows Driver",
+    "recommendation": "KEEP",
+    "risk": "High",
+    "reason": "Microsoft system drivers are part of the Windows platform and should not be changed without a specific reason."
+  },
+  {
+    "match": "HP",
+    "vendor": "HP",
+    "category": "OEM Driver",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP drivers may support firmware, hotkeys, BIOS interfaces, audio, thermal control, or device-specific features."
+  },
+  {
+    "match": "Intel",
+    "vendor": "Intel",
+    "category": "Hardware Driver",
+    "recommendation": "KEEP",
+    "risk": "Medium",
+    "reason": "Intel drivers commonly support chipset, graphics, storage, networking, Bluetooth, and platform functionality."
+  },
+  {
+    "match": "NVIDIA",
+    "vendor": "NVIDIA",
+    "category": "Graphics Driver",
+    "recommendation": "KEEP",
+    "risk": "Medium",
+    "reason": "NVIDIA drivers support graphics acceleration and should generally be kept unless troubleshooting a known driver issue."
+  },
+  {
+    "match": "Realtek",
+    "vendor": "Realtek",
+    "category": "Audio / Network Driver",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "Realtek drivers commonly support audio or network hardware."
+  }
+]
