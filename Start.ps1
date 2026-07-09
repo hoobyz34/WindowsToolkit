@@ -14,7 +14,8 @@ function Show-Menu {
     Show-ToolkitHeader
     Write-Host "1. System Audit"
     Write-Host "2. Service Analyzer"
-    Write-Host "3. Exit"
+    Write-Host "3. Startup Analyzer"
+    Write-Host "4. Exit"
     Write-Host ""
 }
 
@@ -32,6 +33,10 @@ do {
             Pause
         }
         "3" {
+            & "$ScriptRoot\Modules\Startup.ps1"
+            Pause
+        }
+        "4" {
             Write-Host "Exiting."
             break
         }
@@ -40,4 +45,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "3")
+} while ($choice -ne "4")
