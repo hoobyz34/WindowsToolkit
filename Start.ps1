@@ -19,7 +19,8 @@ Write-Host "2. Service Analyzer"
 Write-Host "3. Startup Analyzer"
 Write-Host "4. Installed Software"
 Write-Host "5. HP Analyzer"
-Write-Host "6. Exit"
+Write-Host "6. Driver Analyzer"
+Write-Host "7. Exit"
 Write-Host ""
 }
 
@@ -49,6 +50,10 @@ do {
             Pause
         }
         "6" {
+            & "$ScriptRoot\Modules\Drivers.ps1"
+            Pause
+        }
+        "7" {
             Write-Host "Exiting."
             break
         }
@@ -57,4 +62,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "6")
+} while ($choice -ne "7")
