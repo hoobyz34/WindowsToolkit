@@ -1,6 +1,9 @@
 ﻿param()
 
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+Import-Module "$ScriptRoot\Core\Version.psm1" -Force
+Import-Module "$ScriptRoot\Core\Console.psm1" -Force
 Import-Module "$ScriptRoot\Core\Logger.psm1" -Force
 Import-Module "$ScriptRoot\Core\Utility.psm1" -Force
 Import-Module "$ScriptRoot\Core\Reporting.psm1" -Force
@@ -8,10 +11,7 @@ Import-Module "$ScriptRoot\Core\Reporting.psm1" -Force
 Initialize-ToolkitSession
 
 function Show-Menu {
-    Clear-Host
-    Write-Host "========================================="
-    Write-Host " WindowsToolkit v0.1.0"
-    Write-Host "========================================="
+    Show-ToolkitHeader
     Write-Host "1. System Audit"
     Write-Host "2. Service Analyzer"
     Write-Host "3. Exit"
