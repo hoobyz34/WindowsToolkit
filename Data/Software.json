@@ -1,0 +1,42 @@
+[
+  {
+    "match": "OneDrive",
+    "vendor": "Microsoft",
+    "category": "Cloud Sync",
+    "recommendation": "KEEP",
+    "risk": "Low",
+    "reason": "User profile indicates OneDrive should be kept."
+  },
+  {
+    "match": "Driver Easy",
+    "vendor": "Easeware",
+    "category": "Driver Utility",
+    "recommendation": "KEEP",
+    "risk": "Low",
+    "reason": "User profile indicates Driver Easy should be kept."
+  },
+  {
+    "match": "Microsoft Defender",
+    "vendor": "Microsoft",
+    "category": "Security",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Security component."
+  },
+  {
+    "match": "HP Insights",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely uninstall",
+    "risk": "Low",
+    "reason": "HP analytics component. Usually not required for core Windows operation."
+  },
+  {
+    "match": "HP Touchpoint",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely uninstall",
+    "risk": "Low",
+    "reason": "HP telemetry/support component. Usually optional."
+  }
+]

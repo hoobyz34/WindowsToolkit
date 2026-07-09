@@ -1,0 +1,51 @@
+[
+  {
+    "name": "Microsoft",
+    "patterns": ["Microsoft", "Windows", "Defender", "OneDrive"],
+    "defaultRisk": "Low",
+    "defaultRecommendation": "Keep",
+    "reason": "Microsoft or Windows platform component."
+  },
+  {
+    "name": "HP",
+    "patterns": ["HP", "Hewlett", "Wolf", "Sure", "Touchpoint", "Insights"],
+    "defaultRisk": "Medium",
+    "defaultRecommendation": "Review",
+    "reason": "HP/OEM component; some are useful and some are telemetry or support tools."
+  },
+  {
+    "name": "Intel",
+    "patterns": ["Intel", "DPTF", "Dynamic Tuning", "Management Engine"],
+    "defaultRisk": "Medium",
+    "defaultRecommendation": "Keep / Review",
+    "reason": "Intel hardware, chipset, thermal, or power management component."
+  },
+  {
+    "name": "NVIDIA",
+    "patterns": ["NVIDIA", "NvContainer", "NVDisplay"],
+    "defaultRisk": "Medium",
+    "defaultRecommendation": "Keep / Review",
+    "reason": "NVIDIA GPU driver or support component."
+  },
+  {
+    "name": "Easeware",
+    "patterns": ["Driver Easy", "Easeware"],
+    "defaultRisk": "Low",
+    "defaultRecommendation": "Keep",
+    "reason": "User profile indicates Driver Easy should be kept."
+  },
+  {
+    "name": "Adobe",
+    "patterns": ["Adobe", "Acrobat"],
+    "defaultRisk": "Low",
+    "defaultRecommendation": "Review",
+    "reason": "Adobe component; updater/startup items are often optional."
+  },
+  {
+    "name": "Google",
+    "patterns": ["Google", "Chrome"],
+    "defaultRisk": "Low",
+    "defaultRecommendation": "Review",
+    "reason": "Google component; updater/startup items are often optional."
+  }
+]

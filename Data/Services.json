@@ -1,0 +1,106 @@
+[
+  {
+    "match": "WinDefend",
+    "vendor": "Microsoft",
+    "category": "Security",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Microsoft Defender Antivirus service. Do not disable."
+  },
+  {
+    "match": "wuauserv",
+    "vendor": "Microsoft",
+    "category": "Windows Servicing",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Windows Update service. Required for updates and servicing."
+  },
+  {
+    "match": "BITS",
+    "vendor": "Microsoft",
+    "category": "Windows Servicing",
+    "recommendation": "KEEP",
+    "risk": "High",
+    "reason": "Background transfer service used by Windows Update and Microsoft services."
+  },
+  {
+    "match": "CryptSvc",
+    "vendor": "Microsoft",
+    "category": "Windows Servicing",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Cryptographic Services. Required for Windows signing, updates, certificates, and system integrity."
+  },
+  {
+    "match": "RpcSs",
+    "vendor": "Microsoft",
+    "category": "Core Windows",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Remote Procedure Call service. Core Windows dependency."
+  },
+  {
+    "match": "DcomLaunch",
+    "vendor": "Microsoft",
+    "category": "Core Windows",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "DCOM Server Process Launcher. Core Windows dependency."
+  },
+  {
+    "match": "PlugPlay",
+    "vendor": "Microsoft",
+    "category": "Core Windows",
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Plug and Play service. Required for device detection and hardware functionality."
+  },
+  {
+    "match": "HP Insights",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP analytics or telemetry component. Usually not required for core Windows operation."
+  },
+  {
+    "match": "HP Touchpoint",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP telemetry/support component. Usually safe to review for disabling."
+  },
+  {
+    "match": "HP Hotkey",
+    "vendor": "HP",
+    "category": "OEM Function Keys",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "May support HP function keys, brightness keys, special keys, or workstation controls."
+  },
+  {
+    "match": "HP Audio",
+    "vendor": "HP",
+    "category": "Audio",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "May support HP audio enhancements, conferencing features, or device-specific audio behavior."
+  },
+  {
+    "match": "Intel Dynamic Tuning",
+    "vendor": "Intel",
+    "category": "Thermal / Power",
+    "recommendation": "KEEP",
+    "risk": "High",
+    "reason": "Likely supports mobile workstation thermal and power management."
+  },
+  {
+    "match": "NVIDIA",
+    "vendor": "NVIDIA",
+    "category": "Graphics",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "NVIDIA GPU driver or control service."
+  }
+]

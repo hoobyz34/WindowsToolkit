@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Always keep user-preferred software",
+    "type": "profile",
+    "priority": 100,
+    "action": "keep",
+    "risk": "Low",
+    "reason": "Matched user profile alwaysKeep preference."
+  },
+  {
+    "name": "Review likely-disable profile items",
+    "type": "profile",
+    "priority": 90,
+    "action": "review_likely_disable",
+    "risk": "Low",
+    "reason": "Matched user profile likelyDisable preference."
+  },
+  {
+    "name": "Keep critical Windows services",
+    "type": "service",
+    "priority": 100,
+    "patterns": ["RpcSs", "DcomLaunch", "PlugPlay", "EventLog", "Winmgmt", "LSM", "SamSs"],
+    "recommendation": "KEEP",
+    "risk": "Critical",
+    "reason": "Critical Windows dependency."
+  },
+  {
+    "name": "Review HP telemetry",
+    "type": "general",
+    "priority": 80,
+    "patterns": ["HP Insights", "HP Analytics", "HP Touchpoint", "Telemetry"],
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP analytics or telemetry component."
+  },
+  {
+    "name": "Keep hardware vendor components",
+    "type": "general",
+    "priority": 70,
+    "patterns": ["Intel Dynamic Tuning", "Intel Management Engine", "NVIDIA", "Realtek"],
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "Hardware vendor component may support drivers, power, audio, graphics, or thermal behavior."
+  }
+]
