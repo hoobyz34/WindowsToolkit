@@ -13,7 +13,8 @@ function Show-Menu {
     Write-Host " WindowsToolkit v0.1.0"
     Write-Host "========================================="
     Write-Host "1. System Audit"
-    Write-Host "2. Exit"
+    Write-Host "2. Service Analyzer"
+    Write-Host "3. Exit"
     Write-Host ""
 }
 
@@ -27,6 +28,10 @@ do {
             Pause
         }
         "2" {
+            & "$ScriptRoot\Modules\Services.ps1"
+            Pause
+        }
+        "3" {
             Write-Host "Exiting."
             break
         }
@@ -35,4 +40,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "2")
+} while ($choice -ne "3")
