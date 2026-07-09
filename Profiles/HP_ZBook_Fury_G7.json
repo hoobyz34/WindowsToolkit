@@ -1,0 +1,30 @@
+{
+  "computer": "HP ZBook Fury G7",
+  "owner": "Hayden",
+  "preferences": {
+    "alwaysKeep": [
+      "OneDrive",
+      "Driver Easy",
+      "Microsoft Defender",
+      "Windows Hello",
+      "Windows Update",
+      "Microsoft Store"
+    ],
+    "reviewCarefully": [
+      "HP Hotkey",
+      "HP Diagnostics",
+      "HP Audio",
+      "HP LAN",
+      "HP WLAN",
+      "Intel Dynamic Tuning",
+      "NVIDIA"
+    ],
+    "likelyDisable": [
+      "HP Insights",
+      "HP Analytics",
+      "HP Touchpoint",
+      "Consumer Experience",
+      "Feedback"
+    ]
+  }
+}
