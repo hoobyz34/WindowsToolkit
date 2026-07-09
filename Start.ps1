@@ -7,6 +7,7 @@ Import-Module "$ScriptRoot\Core\Console.psm1" -Force
 Import-Module "$ScriptRoot\Core\Logger.psm1" -Force
 Import-Module "$ScriptRoot\Core\Utility.psm1" -Force
 Import-Module "$ScriptRoot\Core\Reporting.psm1" -Force
+Import-Module "$ScriptRoot\Core\Models.psm1" -Force
 
 Initialize-ToolkitSession
 
