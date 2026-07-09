@@ -1,4 +1,4 @@
-$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$Root = Split-Path -Parent $PSScriptRoot
 
 Import-Module "$Root\Core\Logger.psm1" -Force
 Import-Module "$Root\Core\Reporting.psm1" -Force
