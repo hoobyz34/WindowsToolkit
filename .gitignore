@@ -1,0 +1,5 @@
+﻿Reports/
+Logs/
+Backups/
+*.zip
+*.log
