@@ -4,8 +4,33 @@
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Get-ToolkitPath {
-    param([string]$Name)
+function Get-ToolkitRoot {
+    if ($Global:ToolkitRoot) {
+        return $Global:ToolkitRoot
+    }
 
-    return Join-Path $Global:ToolkitRunPath $Name
+    $current = Get-Location
+
+    while ($current) {
+        if (Test-Path (Join-Path $current ".git")) {
+            $Global:ToolkitRoot = $current.Path
+            return $Global:ToolkitRoot
+        }
+
+        $parent = Split-Path $current -Parent
+
+        if (-not $parent -or $parent -eq $current.Path) {
+            break
+        }
+
+        $current = Get-Item $parent
+    }
+
+    throw "Could not determine WindowsToolkit root."
+}
+
+function Get-ToolkitPath {
+    param([string]$RelativePath)
+
+    return Join-Path (Get-ToolkitRoot) $RelativePath
 }

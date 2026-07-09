@@ -1,6 +1,8 @@
-Import-Module "C:\WindowsToolkit\Core\Logger.psm1" -Force
-Import-Module "C:\WindowsToolkit\Core\Reporting.psm1" -Force
-Import-Module "C:\WindowsToolkit\Core\Console.psm1" -Force
+$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+Import-Module "$Root\Core\Logger.psm1" -Force
+Import-Module "$Root\Core\Reporting.psm1" -Force
+Import-Module "$Root\Core\Console.psm1" -Force
 
 Write-Section "Service Analyzer"
 
