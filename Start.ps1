@@ -20,7 +20,8 @@ Write-Host "3. Startup Analyzer"
 Write-Host "4. Installed Software"
 Write-Host "5. HP Analyzer"
 Write-Host "6. Driver Analyzer"
-Write-Host "7. Exit"
+Write-Host "7. Scheduled Task Analyzer"
+Write-Host "8. Exit"
 Write-Host ""
 }
 
@@ -54,6 +55,10 @@ do {
             Pause
         }
         "7" {
+            & "$ScriptRoot\Modules\ScheduledTasks.ps1"
+            Pause
+        }
+        "8" {
             Write-Host "Exiting."
             break
         }
@@ -62,4 +67,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "7")
+} while ($choice -ne "8")
