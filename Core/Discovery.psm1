@@ -32,3 +32,22 @@ function Get-ToolkitInstalledSoftware {
 function Get-ToolkitDrivers {
     Get-CimInstance Win32_PnPSignedDriver
 }
+function Get-ToolkitWindowsFeatures {
+    [CmdletBinding()]
+    param()
+
+    $output = & dism.exe /Online /Get-Features /Format:Table /English 2>&1
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Windows feature discovery failed. DISM exited with code $LASTEXITCODE."
+    }
+
+    foreach ($line in $output) {
+        if ($line -match '^\s*(?<FeatureName>[^|]+?)\s*\|\s*(?<State>Enabled|Disabled|Enable Pending|Disable Pending|Disabled with Payload Removed)\s*$') {
+            [PSCustomObject]@{
+                FeatureName = $matches.FeatureName.Trim()
+                State       = $matches.State.Trim()
+            }
+        }
+    }
+}

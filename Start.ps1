@@ -15,15 +15,16 @@ Initialize-ToolkitSession
 function Show-Menu {
     Show-ToolkitHeader
     Write-Host "1. System Audit"
-Write-Host "2. Service Analyzer"
-Write-Host "3. Startup Analyzer"
-Write-Host "4. Installed Software"
-Write-Host "5. HP Analyzer"
-Write-Host "6. Driver Analyzer"
-Write-Host "7. Scheduled Task Analyzer"
-Write-Host "8. Exit"
-Write-Host ""
-}
+    Write-Host "2. Service Analyzer"
+    Write-Host "3. Startup Analyzer"
+    Write-Host "4. Installed Software"
+    Write-Host "5. HP Analyzer"
+    Write-Host "6. Driver Analyzer"
+    Write-Host "7. Scheduled Task Analyzer"
+    Write-Host "8. Windows Features Analyzer"
+    Write-Host "9. Exit"
+    Write-Host ""
+    }
 
 do {
     Show-Menu
@@ -59,6 +60,10 @@ do {
             Pause
         }
         "8" {
+            & "$ScriptRoot\Modules\WindowsFeatures.ps1"
+            Pause
+        }
+        "9" {
             Write-Host "Exiting."
             break
         }
@@ -67,4 +72,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "8")
+} while ($choice -ne "9")
