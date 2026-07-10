@@ -51,3 +51,7 @@ function Get-ToolkitWindowsFeatures {
         }
     }
 }
+function Get-ToolkitAppxPackages {
+    Get-AppxPackage |
+        Sort-Object Name
+}

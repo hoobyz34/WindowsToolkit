@@ -22,7 +22,8 @@ function Show-Menu {
     Write-Host "6. Driver Analyzer"
     Write-Host "7. Scheduled Task Analyzer"
     Write-Host "8. Windows Features Analyzer"
-    Write-Host "9. Exit"
+    Write-Host "9. Appx Package Analyzer"
+    Write-Host "10. Exit"
     Write-Host ""
     }
 
@@ -64,6 +65,10 @@ do {
             Pause
         }
         "9" {
+            & "$ScriptRoot\Modules\AppxPackages.ps1"
+            Pause
+        }
+        "10" {
             Write-Host "Exiting."
             break
         }
@@ -72,4 +77,4 @@ do {
             Pause
         }
     }
-} while ($choice -ne "9")
+} while ($choice -ne "10")

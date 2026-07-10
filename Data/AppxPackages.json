@@ -1,0 +1,50 @@
+[
+  {
+    "Match": "Microsoft.WindowsStore",
+    "Vendor": "Microsoft",
+    "Category": "Required",
+    "Recommendation": "Keep",
+    "Risk": "High",
+    "Reason": "Required for Microsoft Store functionality."
+  },
+  {
+    "Match": "Microsoft.DesktopAppInstaller",
+    "Vendor": "Microsoft",
+    "Category": "Required",
+    "Recommendation": "Keep",
+    "Risk": "High",
+    "Reason": "Required for App Installer and MSIX package installation."
+  },
+  {
+    "Match": "Microsoft.WindowsTerminal",
+    "Vendor": "Microsoft",
+    "Category": "Recommended",
+    "Recommendation": "Keep",
+    "Risk": "Low",
+    "Reason": "Modern Windows terminal application."
+  },
+  {
+    "Match": "Clipchamp",
+    "Vendor": "Microsoft",
+    "Category": "Optional",
+    "Recommendation": "Review",
+    "Risk": "Low",
+    "Reason": "Optional video editing application."
+  },
+  {
+    "Match": "Xbox",
+    "Vendor": "Microsoft",
+    "Category": "Optional",
+    "Recommendation": "Review",
+    "Risk": "Low",
+    "Reason": "Gaming-related components."
+  },
+  {
+    "Match": "HP",
+    "Vendor": "HP",
+    "Category": "Vendor",
+    "Recommendation": "Review",
+    "Risk": "Low",
+    "Reason": "HP-specific Store application."
+  }
+]
