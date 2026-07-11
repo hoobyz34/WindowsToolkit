@@ -1,0 +1,36 @@
+name: WindowsToolkit Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Pester
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester `
+            -MinimumVersion 5.0 `
+            -Scope CurrentUser `
+            -Force `
+            -SkipPublisherCheck
+
+      - name: Run WindowsToolkit tests
+        shell: pwsh
+        run: |
+          .\Tests\RunTests.ps1
