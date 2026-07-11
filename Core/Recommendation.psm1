@@ -58,16 +58,17 @@ function Get-ToolkitRecommendation {
         [string]$Type = "general"
     )
 
-    $specificFile = switch ($Type) {
-        "service"  { "Services.json" }
-        "software" { "Software.json" }
-        "driver"   { "Drivers.json" }
-        default    { "Rules.json" }
+    $specificFile = switch ($Type.ToLowerInvariant()) {
+        "service"     { "Services.json" }
+        "software"    { "Software.json" }
+        "driver"      { "Drivers.json" }
+        "appxpackage" { "AppxPackages.json" }
+        default       { "Rules.json" }
     }
 
     $match = Find-ToolkitRuleMatch -Text $Text -RuleFile $specificFile
 
-    if (-not $match) {
+    if (-not $match -and $specificFile -ne "Rules.json") {
         $match = Find-ToolkitRuleMatch -Text $Text -RuleFile "Rules.json"
     }
 
