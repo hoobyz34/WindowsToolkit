@@ -1,17 +1,16 @@
 Describe "Reporting" {
 
     BeforeAll {
-
         $Root = Split-Path -Parent $PSScriptRoot
 
         Import-Module "$Root\Core\Models.psm1" -Force
         Import-Module "$Root\Core\Reporting.psm1" -Force
+    }
 
-        $Global:ToolkitRunPath = Join-Path $env:TEMP "WindowsToolkit_Test"
-
-        if (-not (Test-Path $Global:ToolkitRunPath)) {
-            New-Item -ItemType Directory -Path $Global:ToolkitRunPath | Out-Null
-        }
+    BeforeEach {
+        $Global:ToolkitRunPath = Join-Path `
+            $TestDrive `
+            "WindowsToolkit_Test"
 
         $Finding = New-ToolkitFinding `
             -Name "CPU" `
@@ -27,7 +26,6 @@ Describe "Reporting" {
     }
 
     It "Save-CsvReport creates a CSV" {
-
         Save-CsvReport `
             -Name "UnitTest" `
             -Data @($Finding)
@@ -37,13 +35,20 @@ Describe "Reporting" {
     }
 
     It "CSV contains data" {
+        Save-CsvReport `
+            -Name "UnitTest" `
+            -Data @($Finding)
 
         $csv = Import-Csv "$Global:ToolkitRunPath\UnitTest.csv"
 
-        $csv.Count | Should -Be 1
+        $csv.Count |
+            Should -Be 1
     }
 
     It "CSV contains expected columns" {
+        Save-CsvReport `
+            -Name "UnitTest" `
+            -Data @($Finding)
 
         $csv = Import-Csv "$Global:ToolkitRunPath\UnitTest.csv"
 
@@ -59,11 +64,34 @@ Describe "Reporting" {
             "Version"
             "State"
         ) | ForEach-Object {
-
             $csv[0].PSObject.Properties.Name |
                 Should -Contain $_
-
         }
     }
 
+    It "creates a default repository report path without a session" {
+        $Global:ToolkitRunPath = $null
+
+        $path = Get-ToolkitReportPath
+        $expectedRoot = Join-Path $Root "Reports"
+
+        $path |
+            Should -BeLike "$expectedRoot\Run_*"
+
+        Test-Path $path |
+            Should -BeTrue
+    }
+
+    It "creates a missing report directory automatically" {
+        $Global:ToolkitRunPath = Join-Path `
+            $TestDrive `
+            "Missing\ReportFolder"
+
+        Save-CsvReport `
+            -Name "AutomaticDirectory" `
+            -Data @($Finding)
+
+        Test-Path $Global:ToolkitRunPath |
+            Should -BeTrue
+    }
 }

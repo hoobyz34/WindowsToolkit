@@ -1,35 +1,80 @@
-﻿function Save-TextReport {
+function Get-ToolkitReportPath {
+    [CmdletBinding()]
+    param()
+
+    if (-not $Global:ToolkitRunPath) {
+        $root = Split-Path -Parent $PSScriptRoot
+        $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+
+        $Global:ToolkitRunPath = Join-Path `
+            $root `
+            "Reports\Run_$timestamp"
+    }
+
+    if (-not (Test-Path $Global:ToolkitRunPath)) {
+        New-Item `
+            -ItemType Directory `
+            -Path $Global:ToolkitRunPath `
+            -Force |
+            Out-Null
+    }
+
+    return $Global:ToolkitRunPath
+}
+
+function Save-TextReport {
+    [CmdletBinding()]
     param(
+        [Parameter(Mandatory)]
         [string]$Name,
+
+        [Parameter(Mandatory)]
         [scriptblock]$Command
     )
 
-    if (-not (Test-Path $Global:ToolkitRunPath)) {
-        New-Item -ItemType Directory -Path $Global:ToolkitRunPath -Force | Out-Null
-    }
+    $reportPath = Get-ToolkitReportPath
+    $path = Join-Path $reportPath "$Name.txt"
 
-    $path = Join-Path $Global:ToolkitRunPath "$Name.txt"
     Write-Log "Creating report: $Name"
 
     try {
-        & $Command | Out-File -FilePath $path -Encoding UTF8 -Width 300
+        & $Command |
+            Out-File `
+                -FilePath $path `
+                -Encoding utf8 `
+                -Width 300
     }
     catch {
-        "ERROR creating report: $Name" | Out-File $path -Encoding UTF8
-        $_ | Out-File $path -Append -Encoding UTF8
+        "ERROR creating report: $Name" |
+            Out-File `
+                -FilePath $path `
+                -Encoding utf8
+
+        $_ |
+            Out-File `
+                -FilePath $path `
+                -Append `
+                -Encoding utf8
     }
 }
 
 function Save-CsvReport {
+    [CmdletBinding()]
     param(
+        [Parameter(Mandatory)]
         [string]$Name,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [object[]]$Data
     )
 
-    if (-not (Test-Path $Global:ToolkitRunPath)) {
-        New-Item -ItemType Directory -Path $Global:ToolkitRunPath -Force | Out-Null
-    }
+    $reportPath = Get-ToolkitReportPath
+    $path = Join-Path $reportPath "$Name.csv"
 
-    $path = Join-Path $Global:ToolkitRunPath "$Name.csv"
-    $Data | Export-Csv -Path $path -NoTypeInformation -Encoding UTF8
+    $Data |
+        Export-Csv `
+            -Path $path `
+            -NoTypeInformation `
+            -Encoding utf8
 }
