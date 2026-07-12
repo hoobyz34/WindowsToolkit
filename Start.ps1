@@ -21,7 +21,8 @@ function Show-Menu {
     Write-Host "7. Scheduled Task Analyzer"
     Write-Host "8. Windows Features Analyzer"
     Write-Host "9. Appx Package Analyzer"
-    Write-Host "10. Exit"
+    Write-Host "10. Inventory Summary"
+    Write-Host "11. Exit"
     Write-Host ""
 }
 
@@ -70,6 +71,10 @@ try {
                 Pause
             }
             "10" {
+                & "$ScriptRoot\Modules\Summary.ps1"
+                Pause
+            }
+            "11" {
                 Write-Host "Exiting."
             }
             default {
@@ -77,7 +82,7 @@ try {
                 Pause
             }
         }
-    } while ($choice -ne "10")
+    } while ($choice -ne "11")
 }
 finally {
     Stop-ToolkitSession

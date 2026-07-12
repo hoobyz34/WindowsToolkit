@@ -56,6 +56,8 @@ function Save-TextReport {
                 -Append `
                 -Encoding utf8
     }
+
+    return $path
 }
 
 function Save-CsvReport {
@@ -77,4 +79,33 @@ function Save-CsvReport {
             -Path $path `
             -NoTypeInformation `
             -Encoding utf8
+
+    return $path
+}
+
+function Save-JsonReport {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$Data,
+
+        [ValidateRange(2, 100)]
+        [int]$Depth = 10
+    )
+
+    $reportPath = Get-ToolkitReportPath
+    $path = Join-Path $reportPath "$Name.json"
+
+    $Data |
+        ConvertTo-Json `
+            -Depth $Depth |
+        Set-Content `
+            -Path $path `
+            -Encoding utf8
+
+    return $path
 }

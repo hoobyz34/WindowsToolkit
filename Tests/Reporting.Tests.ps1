@@ -26,31 +26,31 @@ Describe "Reporting" {
     }
 
     It "Save-CsvReport creates a CSV" {
-        Save-CsvReport `
+        $path = Save-CsvReport `
             -Name "UnitTest" `
             -Data @($Finding)
 
-        Test-Path "$Global:ToolkitRunPath\UnitTest.csv" |
+        Test-Path $path |
             Should -BeTrue
     }
 
     It "CSV contains data" {
-        Save-CsvReport `
+        $path = Save-CsvReport `
             -Name "UnitTest" `
             -Data @($Finding)
 
-        $csv = Import-Csv "$Global:ToolkitRunPath\UnitTest.csv"
+        $csv = Import-Csv $path
 
         $csv.Count |
             Should -Be 1
     }
 
     It "CSV contains expected columns" {
-        Save-CsvReport `
+        $path = Save-CsvReport `
             -Name "UnitTest" `
             -Data @($Finding)
 
-        $csv = Import-Csv "$Global:ToolkitRunPath\UnitTest.csv"
+        $csv = Import-Csv $path
 
         @(
             "Name"
@@ -93,5 +93,34 @@ Describe "Reporting" {
 
         Test-Path $Global:ToolkitRunPath |
             Should -BeTrue
+    }
+
+    It "Save-JsonReport creates valid JSON" {
+        $path = Save-JsonReport `
+            -Name "UnitTest" `
+            -Data $Finding
+
+        Test-Path $path |
+            Should -BeTrue
+
+        {
+            Get-Content $path -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+        } | Should -Not -Throw
+    }
+
+    It "Save-JsonReport preserves object values" {
+        $path = Save-JsonReport `
+            -Name "UnitTest" `
+            -Data $Finding
+
+        $json = Get-Content $path -Raw |
+            ConvertFrom-Json
+
+        $json.Name |
+            Should -Be "CPU"
+
+        $json.Vendor |
+            Should -Be "Intel"
     }
 }
