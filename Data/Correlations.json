@@ -1,0 +1,182 @@
+[
+  {
+    "id": "hp-security-stack",
+    "name": "HP Security Stack Detected",
+    "category": "Security Stack",
+    "recommendation": "Keep / Review as a complete stack",
+    "risk": "Medium",
+    "reason": "Multiple HP security components are installed. Review the stack as a coordinated system rather than removing individual components without understanding dependencies.",
+    "all": [
+      {
+        "pattern": "HP Wolf|HP Sure Click|HP Client Security|HP Security",
+        "minCount": 2
+      }
+    ]
+  },
+  {
+    "id": "hp-platform-support",
+    "name": "HP Platform Support Components Detected",
+    "category": "OEM Platform",
+    "recommendation": "Keep",
+    "risk": "High",
+    "reason": "HP platform components may support hotkeys, firmware, BIOS communication, thermal behavior, audio, or device-specific functionality.",
+    "all": [
+      {
+        "pattern": "HP Hotkey|HP System Event|HP Software Framework|HP BIOS|HP Firmware",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "docker-vmp-disabled",
+    "name": "Docker Installed with Virtual Machine Platform Disabled",
+    "category": "Configuration Conflict",
+    "recommendation": "Review Windows virtualization configuration",
+    "risk": "Medium",
+    "reason": "Docker-related software was detected while VirtualMachinePlatform appears disabled. Docker Desktop using WSL 2 may not operate correctly in this configuration.",
+    "all": [
+      {
+        "type": "Software",
+        "pattern": "Docker",
+        "minCount": 1
+      },
+      {
+        "type": "WindowsFeature",
+        "pattern": "^VirtualMachinePlatform$",
+        "statePattern": "Disabled",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "docker-vmp-enabled",
+    "name": "Docker Virtualization Support Detected",
+    "category": "Configuration",
+    "recommendation": "Keep",
+    "risk": "Low",
+    "reason": "Docker-related software and the Virtual Machine Platform feature were both detected, indicating that core WSL 2 virtualization support is available.",
+    "all": [
+      {
+        "type": "Software",
+        "pattern": "Docker",
+        "minCount": 1
+      },
+      {
+        "type": "WindowsFeature",
+        "pattern": "^VirtualMachinePlatform$",
+        "statePattern": "Enabled",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "store-and-app-installer",
+    "name": "Microsoft Store Installation Stack Present",
+    "category": "Windows Application Platform",
+    "recommendation": "Keep",
+    "risk": "High",
+    "reason": "Microsoft Store and Desktop App Installer are both present. Together they support Store applications, MSIX packages, and winget-related installation workflows.",
+    "all": [
+      {
+        "type": "AppxPackage",
+        "pattern": "Microsoft.WindowsStore",
+        "minCount": 1
+      },
+      {
+        "type": "AppxPackage",
+        "pattern": "Microsoft.DesktopAppInstaller",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "store-missing",
+    "name": "Microsoft Store Package Not Detected",
+    "category": "Missing Component",
+    "recommendation": "Investigate before changing Appx packages",
+    "risk": "High",
+    "reason": "No Microsoft Store package was found in the available Appx inventory. Store applications and related update workflows may be unavailable.",
+    "none": [
+      {
+        "type": "AppxPackage",
+        "pattern": "Microsoft.WindowsStore",
+        "minCount": 1
+      }
+    ],
+    "requiresTypes": [
+      "AppxPackage"
+    ]
+  },
+  {
+    "id": "intel-driver-software",
+    "name": "Intel Driver and Companion Software Detected",
+    "category": "Driver Ecosystem",
+    "recommendation": "Keep / Review",
+    "risk": "Low",
+    "reason": "Intel drivers and Intel companion software were both detected. The software may provide configuration, diagnostics, or update functionality for installed Intel hardware.",
+    "all": [
+      {
+        "type": "Driver",
+        "pattern": "Intel",
+        "minCount": 1
+      },
+      {
+        "type": "Software",
+        "pattern": "Intel",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "nvidia-driver-software",
+    "name": "NVIDIA Driver and Companion Software Detected",
+    "category": "Driver Ecosystem",
+    "recommendation": "Keep / Review",
+    "risk": "Low",
+    "reason": "NVIDIA driver and companion software components were detected together.",
+    "all": [
+      {
+        "type": "Driver",
+        "pattern": "NVIDIA",
+        "minCount": 1
+      },
+      {
+        "type": "Software",
+        "pattern": "NVIDIA",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "wsl-platform",
+    "name": "WSL Virtualization Platform Enabled",
+    "category": "Windows Virtualization",
+    "recommendation": "Keep if WSL or virtualization is used",
+    "risk": "Low",
+    "reason": "VirtualMachinePlatform is enabled, providing virtualization infrastructure commonly used by WSL 2 and container tooling.",
+    "all": [
+      {
+        "type": "WindowsFeature",
+        "pattern": "^VirtualMachinePlatform$",
+        "statePattern": "Enabled",
+        "minCount": 1
+      }
+    ]
+  },
+  {
+    "id": "telnet-enabled",
+    "name": "Telnet Client Enabled",
+    "category": "Legacy Protocol",
+    "recommendation": "Review",
+    "risk": "Medium",
+    "reason": "The legacy Telnet client is enabled. Keep it only when required for a specific administrative or compatibility workflow.",
+    "all": [
+      {
+        "type": "WindowsFeature",
+        "pattern": "^TelnetClient$",
+        "statePattern": "Enabled",
+        "minCount": 1
+      }
+    ]
+  }
+]

@@ -24,7 +24,8 @@ function Show-Menu {
     Write-Host "10. Inventory Summary"
     Write-Host "11. HTML Inventory Dashboard"
     Write-Host "12. Inventory Health Score"
-    Write-Host "13. Exit"
+    Write-Host "13. Cross-Analyzer Correlation"
+    Write-Host "14. Exit"
     Write-Host ""
 }
 
@@ -85,6 +86,10 @@ try {
                 Pause
             }
             "13" {
+                & "$ScriptRoot\Modules\Correlation.ps1"
+                Pause
+            }
+            "14" {
                 Write-Host "Exiting."
             }
             default {
@@ -92,7 +97,7 @@ try {
                 Pause
             }
         }
-    } while ($choice -ne "13")
+    } while ($choice -ne "14")
 }
 finally {
     Stop-ToolkitSession

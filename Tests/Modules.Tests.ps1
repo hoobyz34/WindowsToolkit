@@ -13,6 +13,7 @@ $AnalyzerFiles = @(
     "Summary.ps1"
     "Dashboard.ps1"
     "Health.ps1"
+    "Correlation.ps1"
 )
 
 Describe "Analyzer Module Integrity" {
