@@ -1,9 +1,11 @@
-if (-not $Global:ToolkitTimestamp) {
-    $Global:ToolkitTimestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-}
-
 function Initialize-ToolkitSession {
+    [CmdletBinding()]
+    param(
+        [string]$Timestamp = (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
+    )
+
     $Global:ToolkitRoot = Split-Path -Parent $PSScriptRoot
+    $Global:ToolkitTimestamp = $Timestamp
 
     $Global:ToolkitRunPath = Join-Path `
         $Global:ToolkitRoot `
@@ -31,6 +33,21 @@ function Initialize-ToolkitSession {
         Out-Null
 
     Write-Log "Toolkit session initialized."
+}
+
+function Stop-ToolkitSession {
+    [CmdletBinding()]
+    param()
+
+    Write-Log "Toolkit session completed."
+
+    try {
+        Stop-Transcript |
+            Out-Null
+    }
+    catch {
+        # No active transcript. Nothing to stop.
+    }
 }
 
 function Write-Log {

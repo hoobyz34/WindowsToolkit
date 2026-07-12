@@ -10,7 +10,7 @@ Describe "Logger and Session Initialization" {
         $Global:ToolkitRoot = $null
         $Global:ToolkitRunPath = $null
         $Global:ToolkitLogPath = $null
-        $Global:ToolkitTimestamp = "2000-01-01_00-00-00"
+        $Global:ToolkitTimestamp = $null
 
         Mock New-Item -ModuleName Logger {
             [PSCustomObject]@{
@@ -22,20 +22,34 @@ Describe "Logger and Session Initialization" {
             $null
         }
 
+        Mock Stop-Transcript -ModuleName Logger {
+            $null
+        }
+
         Mock Write-Log -ModuleName Logger {
             $null
         }
     }
 
     It "sets the toolkit root to the repository directory" {
-        Initialize-ToolkitSession
+        Initialize-ToolkitSession `
+            -Timestamp "2000-01-01_00-00-00"
 
         $Global:ToolkitRoot |
             Should -Be $Root
     }
 
+    It "uses the supplied timestamp for deterministic session paths" {
+        Initialize-ToolkitSession `
+            -Timestamp "2000-01-01_00-00-00"
+
+        $Global:ToolkitTimestamp |
+            Should -Be "2000-01-01_00-00-00"
+    }
+
     It "places reports inside the repository Reports directory" {
-        Initialize-ToolkitSession
+        Initialize-ToolkitSession `
+            -Timestamp "2000-01-01_00-00-00"
 
         $Expected = Join-Path `
             $Root `
@@ -46,7 +60,8 @@ Describe "Logger and Session Initialization" {
     }
 
     It "places logs inside the repository Logs directory" {
-        Initialize-ToolkitSession
+        Initialize-ToolkitSession `
+            -Timestamp "2000-01-01_00-00-00"
 
         $Expected = Join-Path `
             $Root `
@@ -57,7 +72,8 @@ Describe "Logger and Session Initialization" {
     }
 
     It "creates both report and log directories" {
-        Initialize-ToolkitSession
+        Initialize-ToolkitSession `
+            -Timestamp "2000-01-01_00-00-00"
 
         Should -Invoke New-Item `
             -ModuleName Logger `
@@ -65,7 +81,8 @@ Describe "Logger and Session Initialization" {
     }
 
     It "starts a transcript for the current session" {
-        Initialize-ToolkitSession
+        Initialize-ToolkitSession `
+            -Timestamp "2000-01-01_00-00-00"
 
         Should -Invoke Start-Transcript `
             -ModuleName Logger `
@@ -73,5 +90,13 @@ Describe "Logger and Session Initialization" {
             -ParameterFilter {
                 $Path -eq $Global:ToolkitLogPath
             }
+    }
+
+    It "stops the transcript when the session ends" {
+        Stop-ToolkitSession
+
+        Should -Invoke Stop-Transcript `
+            -ModuleName Logger `
+            -Times 1
     }
 }
