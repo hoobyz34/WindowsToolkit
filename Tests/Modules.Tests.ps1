@@ -12,6 +12,7 @@ $AnalyzerFiles = @(
     "AppxPackages.ps1"
     "Summary.ps1"
     "Dashboard.ps1"
+    "Health.ps1"
 )
 
 Describe "Analyzer Module Integrity" {

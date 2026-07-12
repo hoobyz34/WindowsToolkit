@@ -12,6 +12,7 @@ function Get-ToolkitReportFindings {
     $excludedReports = @(
         "Inventory_Summary.csv"
         "Inventory_Summary_Details.csv"
+        "Health_Score.csv"
     )
 
     $findings = foreach (
@@ -115,6 +116,7 @@ function Get-ToolkitInventorySummary {
                 $_.Name -notin @(
                     "Inventory_Summary.csv"
                     "Inventory_Summary_Details.csv"
+        "Health_Score.csv"
                 )
             } |
             Sort-Object Name |
@@ -208,4 +210,3 @@ function ConvertTo-ToolkitSummaryRows {
 
     return $rows
 }
-

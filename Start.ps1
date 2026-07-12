@@ -23,7 +23,8 @@ function Show-Menu {
     Write-Host "9. Appx Package Analyzer"
     Write-Host "10. Inventory Summary"
     Write-Host "11. HTML Inventory Dashboard"
-    Write-Host "12. Exit"
+    Write-Host "12. Inventory Health Score"
+    Write-Host "13. Exit"
     Write-Host ""
 }
 
@@ -80,6 +81,10 @@ try {
                 Pause
             }
             "12" {
+                & "$ScriptRoot\Modules\Health.ps1"
+                Pause
+            }
+            "13" {
                 Write-Host "Exiting."
             }
             default {
@@ -87,7 +92,7 @@ try {
                 Pause
             }
         }
-    } while ($choice -ne "12")
+    } while ($choice -ne "13")
 }
 finally {
     Stop-ToolkitSession
