@@ -124,3 +124,38 @@ Describe "Reporting" {
             Should -Be "Intel"
     }
 }
+
+Describe "HTML Reporting" {
+
+    BeforeAll {
+        $Root = Split-Path -Parent $PSScriptRoot
+        Import-Module "$Root\Core\Reporting.psm1" -Force
+    }
+
+    BeforeEach {
+        $Global:ToolkitRunPath = Join-Path `
+            $TestDrive `
+            "HtmlReports"
+    }
+
+    It "Save-HtmlReport creates an HTML file" {
+        $path = Save-HtmlReport `
+            -Name "UnitTest" `
+            -Html "<html><body>Test</body></html>"
+
+        Test-Path $path |
+            Should -BeTrue
+
+        [System.IO.Path]::GetExtension($path) |
+            Should -Be ".html"
+    }
+
+    It "Save-HtmlReport preserves HTML content" {
+        $path = Save-HtmlReport `
+            -Name "UnitTest" `
+            -Html "<html><body>Toolkit Test</body></html>"
+
+        Get-Content $path -Raw |
+            Should -Match "Toolkit Test"
+    }
+}

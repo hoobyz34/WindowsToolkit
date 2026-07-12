@@ -109,3 +109,24 @@ function Save-JsonReport {
 
     return $path
 }
+
+function Save-HtmlReport {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter(Mandatory)]
+        [string]$Html
+    )
+
+    $reportPath = Get-ToolkitReportPath
+    $path = Join-Path $reportPath "$Name.html"
+
+    Set-Content `
+        -Path $path `
+        -Value $Html `
+        -Encoding utf8
+
+    return $path
+}
