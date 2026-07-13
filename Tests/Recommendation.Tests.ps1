@@ -1,5 +1,3 @@
-$Root = Split-Path -Parent $PSScriptRoot
-
 $RuleFiles = @(
     "Rules.json"
     "Services.json"
@@ -12,13 +10,13 @@ $RuleFiles = @(
 Describe "Recommendation Data Files" {
 
     It "Data file <_> exists" -ForEach $RuleFiles {
-        Test-Path "$Root\Data\$_" |
+        Test-Path "$PSScriptRoot\..\Data\$_" |
             Should -BeTrue
     }
 
     It "Data file <_> contains valid JSON" -ForEach $RuleFiles {
         {
-            Get-Content "$Root\Data\$_" -Raw |
+            Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
                 ConvertFrom-Json -ErrorAction Stop
         } | Should -Not -Throw
     }
@@ -36,7 +34,7 @@ Describe "Recommendation Rule Schema" {
 
     It "<_> contains at least one rule" -ForEach $RecommendationFiles {
         $rules = @(
-            Get-Content "$Root\Data\$_" -Raw |
+                Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
                 ConvertFrom-Json
         )
 
@@ -46,7 +44,7 @@ Describe "Recommendation Rule Schema" {
 
     It "every rule in <_> contains a reason" -ForEach $RecommendationFiles {
         $rules = @(
-            Get-Content "$Root\Data\$_" -Raw |
+                Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
                 ConvertFrom-Json
         )
 
@@ -58,7 +56,7 @@ Describe "Recommendation Rule Schema" {
 
     It "every rule in <_> contains a risk" -ForEach $RecommendationFiles {
         $rules = @(
-            Get-Content "$Root\Data\$_" -Raw |
+                Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
                 ConvertFrom-Json
         )
 
@@ -70,7 +68,7 @@ Describe "Recommendation Rule Schema" {
 
     It "every rule in <_> contains a recommendation or action" -ForEach $RecommendationFiles {
         $rules = @(
-            Get-Content "$Root\Data\$_" -Raw |
+                Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
                 ConvertFrom-Json
         )
 
@@ -90,7 +88,7 @@ Describe "Recommendation Rule Schema" {
 
     It "every rule in <_> contains match text or patterns" -ForEach $RecommendationFiles {
         $rules = @(
-            Get-Content "$Root\Data\$_" -Raw |
+                Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
                 ConvertFrom-Json
         )
 
@@ -115,7 +113,7 @@ Describe "Vendor Rule Schema" {
 
     BeforeAll {
         $Vendors = @(
-            Get-Content "$Root\Data\Vendors.json" -Raw |
+            Get-Content "$PSScriptRoot\..\Data\Vendors.json" -Raw |
                 ConvertFrom-Json
         )
     }
@@ -143,7 +141,7 @@ Describe "Vendor Rule Schema" {
 Describe "Recommendation Rule Routing" {
 
     BeforeAll {
-        Import-Module "$Root\Core\Recommendation.psm1" -Force
+        Import-Module "$PSScriptRoot\..\Core\Recommendation.psm1" -Force
     }
 
     It "uses Drivers.json for driver recommendations" {
@@ -195,7 +193,7 @@ Describe "Recommendation Rule Routing" {
 Describe "Profile Recommendation Boundaries" {
 
     BeforeAll {
-        Import-Module "$Root\Core\Recommendation.psm1" -Force
+        Import-Module "$PSScriptRoot\..\Core\Recommendation.psm1" -Force
     }
 
     It "keeps an exact alwaysKeep profile name" -ForEach @(
@@ -234,7 +232,7 @@ Describe "Profile Recommendation Boundaries" {
 
         foreach ($ruleFile in $ruleFiles) {
             $rules = @(
-                Get-Content "$Root\Data\$ruleFile" -Raw |
+                Get-Content "$PSScriptRoot\..\Data\$ruleFile" -Raw |
                     ConvertFrom-Json
             )
 
