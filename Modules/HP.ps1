@@ -5,163 +5,127 @@ Import-Module "$Root\Core\Console.psm1" -Force
 Import-Module "$Root\Core\Reporting.psm1" -Force
 Import-Module "$Root\Core\Models.psm1" -Force
 Import-Module "$Root\Core\Discovery.psm1" -Force
+Import-Module "$Root\Core\Recommendation.psm1" -Force
 
 Write-Section "HP Analyzer"
 
-function Get-HPClassification {
-    param(
-        [string]$Name,
-        [string]$Type
-    )
-
-    $text = "$Name $Type"
-
-    if ($text -match "Hotkey|System Event|Button|Quick Launch") {
-        return @{
-            Category = "Required"
-            Recommendation = "KEEP"
-            Risk = "Medium"
-            Reason = "Likely supports HP function keys, special keys, brightness keys, or hardware buttons."
-        }
-    }
-
-    if ($text -match "Wolf|Sure Click|Sure Sense|Sure Run|Sure Recover|Client Security") {
-        return @{
-            Category = "Recommended"
-            Recommendation = "KEEP / Review"
-            Risk = "Medium"
-            Reason = "HP security component. Usually beneficial, but review based on your security setup."
-        }
-    }
-
-    if ($text -match "Diagnostics|Support Assistant|System Information|BIOS|Firmware") {
-        return @{
-            Category = "Recommended"
-            Recommendation = "KEEP / Optional"
-            Risk = "Low"
-            Reason = "Useful for diagnostics, firmware, support, or system identification."
-        }
-    }
-
-    if ($text -match "Insights|Analytics|Touchpoint|Telemetry|App Helper|Notifications") {
-        return @{
-            Category = "Telemetry"
-            Recommendation = "Review / likely disable"
-            Risk = "Low"
-            Reason = "HP analytics, telemetry, support, or notification component. Usually not required for core hardware function."
-        }
-    }
-
-    if ($text -match "Audio|LAN|WLAN|Network|Connection Optimizer") {
-        return @{
-            Category = "Optional"
-            Recommendation = "KEEP / Review"
-            Risk = "Medium"
-            Reason = "May support HP-specific audio, network switching, or connectivity behavior."
-        }
-    }
-
-    return @{
-        Category = "Unknown"
-        Recommendation = "Review"
-        Risk = "Unknown"
-        Reason = "HP-related item detected, but no specific rule matched yet."
-    }
-}
-
 $findings = @()
 
-# HP Services
-Get-ToolkitServices |
-    Where-Object {
-        "$($_.Name) $($_.DisplayName) $($_.PathName)" -match "HP|Hewlett|Wolf|Sure|Touchpoint|Insights"
-    } |
-    ForEach-Object {
-        $class = Get-HPClassification -Name "$($_.Name) $($_.DisplayName)" -Type "Service"
+function Add-HPFinding {
+    param(
+        [Parameter(Mandatory)]
+        [object]$Item,
 
-        $findings += New-ToolkitFinding `
-            -Name $_.DisplayName `
-            -Type "HP Service" `
-            -Vendor "HP" `
-            -Category $class.Category `
-            -Recommendation $class.Recommendation `
-            -Risk $class.Risk `
-            -Reason $class.Reason `
-            -Source "Windows Service" `
-            -Version "" `
-            -State $_.State
+        [Parameter(Mandatory)]
+        [string]$Type,
+
+        [Parameter(Mandatory)]
+        [string]$Text,
+
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter(Mandatory)]
+        [string]$Source,
+
+        [string]$Version = "",
+        [string]$State = ""
+    )
+
+    $vendorContext = Get-ToolkitRecommendation `
+        -Text $Text `
+        -Type "general"
+
+    if ($vendorContext.Vendor -ne "HP") {
+        return
     }
 
-# HP Installed Software
-Get-ToolkitInstalledSoftware |
-    Where-Object {
-        "$($_.DisplayName) $($_.Publisher)" -match "HP|Hewlett|Wolf|Sure|Touchpoint|Insights"
-    } |
-    ForEach-Object {
-        $name = if ($_.DisplayName) { $_.DisplayName } else { "Unknown HP Software" }
-        $class = Get-HPClassification -Name $name -Type "Software"
+    $recommendation = Get-ToolkitRecommendation `
+        -Text $Text `
+        -Type "hp"
 
-        $findings += New-ToolkitFinding `
-            -Name $name `
-            -Type "HP Software" `
-            -Vendor "HP" `
-            -Category $class.Category `
-            -Recommendation $class.Recommendation `
-            -Risk $class.Risk `
-            -Reason $class.Reason `
-            -Source "Installed Software" `
-            -Version $_.DisplayVersion `
-            -State "Installed"
+    $script:findings += New-ToolkitFinding `
+        -Name $Name `
+        -Type $Type `
+        -Vendor $recommendation.Vendor `
+        -Category $recommendation.Category `
+        -Recommendation $recommendation.Recommendation `
+        -Risk $recommendation.Risk `
+        -Reason $recommendation.Reason `
+        -Source $Source `
+        -Version $Version `
+        -State $State
+}
+
+foreach ($service in Get-ToolkitServices) {
+    Add-HPFinding `
+        -Item $service `
+        -Type "HP Service" `
+        -Text "$($service.Name) $($service.DisplayName) $($service.PathName)" `
+        -Name $service.DisplayName `
+        -Source "Windows Service" `
+        -State $service.State
+}
+
+foreach ($software in Get-ToolkitInstalledSoftware) {
+    if ([string]::IsNullOrWhiteSpace([string]$software.DisplayName)) {
+        continue
     }
 
-# HP Drivers
-Get-ToolkitDrivers |
-    Where-Object {
-        "$($_.DeviceName) $($_.Manufacturer) $($_.InfName)" -match "HP|Hewlett|Wolf|Sure"
-    } |
-    ForEach-Object {
-        $name = if ($_.DeviceName) { $_.DeviceName } else { "Unknown HP Driver" }
-        $class = Get-HPClassification -Name $name -Type "Driver"
-
-        $findings += New-ToolkitFinding `
-            -Name $name `
-            -Type "HP Driver" `
-            -Vendor "HP" `
-            -Category $class.Category `
-            -Recommendation $class.Recommendation `
-            -Risk $class.Risk `
-            -Reason $class.Reason `
-            -Source $_.InfName `
-            -Version $_.DriverVersion `
-            -State "Installed"
+    $source = if ($software.PSPath) {
+        $software.PSPath
+    }
+    elseif ($software.InstallLocation) {
+        $software.InstallLocation
+    }
+    else {
+        "Windows Uninstall Registry"
     }
 
-# HP Scheduled Tasks
-Get-ToolkitScheduledTasks |
-    Where-Object {
-        "$($_.TaskName) $($_.TaskPath) $($_.Author)" -match "HP|Hewlett|Wolf|Sure|Touchpoint|Insights"
-    } |
-    ForEach-Object {
-        $name = "$($_.TaskPath)$($_.TaskName)"
-        $class = Get-HPClassification -Name $name -Type "Scheduled Task"
+    Add-HPFinding `
+        -Item $software `
+        -Type "HP Software" `
+        -Text "$($software.DisplayName) $($software.Publisher)" `
+        -Name $software.DisplayName `
+        -Source $source `
+        -Version $software.DisplayVersion `
+        -State "Installed"
+}
 
-        $findings += New-ToolkitFinding `
-            -Name $name `
-            -Type "HP Scheduled Task" `
-            -Vendor "HP" `
-            -Category $class.Category `
-            -Recommendation $class.Recommendation `
-            -Risk $class.Risk `
-            -Reason $class.Reason `
-            -Source "Task Scheduler" `
-            -Version "" `
-            -State $_.State
+foreach ($driver in Get-ToolkitDrivers) {
+    $name = if ($driver.DeviceName) {
+        $driver.DeviceName
+    }
+    else {
+        "Unknown HP Driver"
     }
 
-Save-CsvReport `
+    Add-HPFinding `
+        -Item $driver `
+        -Type "HP Driver" `
+        -Text "$($driver.DeviceName) $($driver.Manufacturer) $($driver.DriverProviderName) $($driver.InfName)" `
+        -Name $name `
+        -Source $driver.InfName `
+        -Version $driver.DriverVersion `
+        -State "Installed"
+}
+
+foreach ($task in Get-ToolkitScheduledTasks) {
+    $name = "$($task.TaskPath)$($task.TaskName)"
+
+    Add-HPFinding `
+        -Item $task `
+        -Type "HP Scheduled Task" `
+        -Text "$name $($task.Author)" `
+        -Name $name `
+        -Source "Task Scheduler" `
+        -State $task.State
+}
+
+$reportPath = Save-CsvReport `
     -Name "HP_Analyzer" `
     -Data $findings
 
 Write-Success "HP Analyzer complete."
 Write-Host "HP items found: $($findings.Count)"
-Write-Host "Report saved to: $Global:ToolkitRunPath\HP_Analyzer.csv"
+Write-Host "Report saved to: $reportPath"

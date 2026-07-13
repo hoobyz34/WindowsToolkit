@@ -115,6 +115,7 @@ function Get-ToolkitRecommendation {
         "service"     { "Services.json" }
         "software"    { "Software.json" }
         "driver"      { "Drivers.json" }
+        "hp"          { "HP.json" }
         "appxpackage" { "AppxPackages.json" }
         default       { "Rules.json" }
     }

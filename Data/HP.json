@@ -1,0 +1,210 @@
+[
+  {
+    "match": "Hotkey",
+    "vendor": "HP",
+    "category": "Required",
+    "recommendation": "KEEP",
+    "risk": "Medium",
+    "reason": "HP hotkey components may support function keys, brightness keys, special keys, or workstation controls."
+  },
+  {
+    "match": "System Event",
+    "vendor": "HP",
+    "category": "Required",
+    "recommendation": "KEEP",
+    "risk": "Medium",
+    "reason": "HP system event components may support hardware buttons and device-specific controls."
+  },
+  {
+    "match": "Button",
+    "vendor": "HP",
+    "category": "Required",
+    "recommendation": "KEEP",
+    "risk": "Medium",
+    "reason": "HP button components may support workstation hardware controls."
+  },
+  {
+    "match": "Quick Launch",
+    "vendor": "HP",
+    "category": "Required",
+    "recommendation": "KEEP",
+    "risk": "Medium",
+    "reason": "HP Quick Launch components may support special keys and hardware controls."
+  },
+  {
+    "match": "Wolf",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Wolf security components are generally beneficial, but should be reviewed with the security configuration."
+  },
+  {
+    "match": "Sure Click",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Sure Click provides security functionality and should be reviewed before any change."
+  },
+  {
+    "match": "Sure Sense",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Sure Sense provides security functionality and should be reviewed before any change."
+  },
+  {
+    "match": "Sure Run",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Sure Run provides security functionality and should be reviewed before any change."
+  },
+  {
+    "match": "Sure Recover",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Sure Recover supports recovery workflows and should be reviewed before any change."
+  },
+  {
+    "match": "Client Security",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Client Security supports device security workflows and should be reviewed before any change."
+  },
+  {
+    "match": "Diagnostics",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Optional",
+    "risk": "Low",
+    "reason": "HP diagnostic components can help troubleshoot the workstation."
+  },
+  {
+    "match": "Support Assistant",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Optional",
+    "risk": "Low",
+    "reason": "HP Support Assistant can provide diagnostics, support, and firmware guidance."
+  },
+  {
+    "match": "System Information",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Optional",
+    "risk": "Low",
+    "reason": "HP system information components can help identify and support the workstation."
+  },
+  {
+    "match": "BIOS",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Optional",
+    "risk": "Low",
+    "reason": "HP BIOS components may support firmware configuration and maintenance."
+  },
+  {
+    "match": "Firmware",
+    "vendor": "HP",
+    "category": "Recommended",
+    "recommendation": "KEEP / Optional",
+    "risk": "Low",
+    "reason": "HP firmware components may support device maintenance and hardware stability."
+  },
+  {
+    "match": "Insights",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP Insights is an analytics or telemetry component and is usually not required for core hardware function."
+  },
+  {
+    "match": "Analytics",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP analytics is usually optional; review before disabling to confirm no support dependency."
+  },
+  {
+    "match": "Touchpoint",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP Touchpoint is a telemetry or support component and is usually optional."
+  },
+  {
+    "match": "Telemetry",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP telemetry is usually not required for core hardware function."
+  },
+  {
+    "match": "App Helper",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP application helpers may provide optional notifications or telemetry."
+  },
+  {
+    "match": "Notifications",
+    "vendor": "HP",
+    "category": "Telemetry",
+    "recommendation": "Review / likely disable",
+    "risk": "Low",
+    "reason": "HP notification components are usually optional; review before disabling."
+  },
+  {
+    "match": "Audio",
+    "vendor": "HP",
+    "category": "Optional",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP audio components may support device-specific audio behavior or enhancements."
+  },
+  {
+    "match": "LAN",
+    "vendor": "HP",
+    "category": "Optional",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP LAN components may support device-specific connectivity behavior."
+  },
+  {
+    "match": "WLAN",
+    "vendor": "HP",
+    "category": "Optional",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP WLAN components may support device-specific connectivity behavior."
+  },
+  {
+    "match": "Network",
+    "vendor": "HP",
+    "category": "Optional",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP network components may support device-specific connectivity behavior."
+  },
+  {
+    "match": "Connection Optimizer",
+    "vendor": "HP",
+    "category": "Optional",
+    "recommendation": "KEEP / Review",
+    "risk": "Medium",
+    "reason": "HP Connection Optimizer may support network switching or connectivity behavior."
+  }
+]
