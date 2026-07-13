@@ -14,7 +14,7 @@ WindowsToolkit is a modular Windows auditing and optimization platform focused o
 
 # Current Version
 
-v0.2.0
+v0.3.0
 
 ---
 
@@ -30,19 +30,16 @@ v0.2.0
 - [x] Configuration profiles
 - [x] Recommendation engine
 - [x] Data-driven rule files
+- [x] Installed Software Analyzer
+- [x] Driver Analyzer
+- [x] HP Analyzer
+- [x] Inventory Engine standardization
 
 ---
 
 # Current Sprint
 
-## Issue #1
-Refactor Service Analyzer to use Recommendation Engine.
-
-## Issue #2
-Refactor Startup Analyzer to use Recommendation Engine.
-
-## Issue #3
-Create Installed Software Analyzer.
+v0.3.0 Inventory Engine complete.
 
 ---
 
@@ -50,7 +47,6 @@ Create Installed Software Analyzer.
 
 ## Inventory
 
-- Drivers
 - Scheduled Tasks
 - Windows Features
 - Appx Packages

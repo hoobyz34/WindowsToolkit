@@ -10,9 +10,9 @@ Complete the Inventory Engine.
 
 ## Active Tasks
 
-- [ ] HP Analyzer
-- [ ] Installed Software Analyzer
-- [ ] Driver Analyzer
+- [x] HP Analyzer
+- [x] Installed Software Analyzer
+- [x] Driver Analyzer
 
 ## Blockers
 
@@ -20,7 +20,7 @@ None
 
 ## Next Commit
 
-Refactor Startup Analyzer to use Recommendation Engine
+Release documentation reconciliation for v0.3.0
 
 ## Definition of Done
 
