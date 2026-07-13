@@ -1,3 +1,5 @@
+Import-Module (Join-Path $PSScriptRoot "Config.psm1") -Force
+
 function Get-ToolkitDataFile {
     param([string]$FileName)
 
@@ -52,11 +54,62 @@ function Get-ToolkitVendor {
     return "Unknown"
 }
 
+function Get-ToolkitProfileRecommendation {
+    param([string]$Name)
+
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        return $null
+    }
+
+    $configuration = Get-ToolkitConfiguration
+
+    foreach ($preference in $configuration.preferences.alwaysKeep) {
+        if ([string]::Equals(
+            $Name,
+            [string]$preference,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+            return [pscustomobject]@{
+                Vendor         = Get-ToolkitVendor -Text $Name
+                Category       = "User Preference"
+                Recommendation = "KEEP"
+                Risk           = "Low"
+                Reason         = "Matches user profile alwaysKeep preference: $preference"
+            }
+        }
+    }
+
+    foreach ($preference in $configuration.preferences.likelyDisable) {
+        if ([string]::Equals(
+            $Name,
+            [string]$preference,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )) {
+            return [pscustomobject]@{
+                Vendor         = Get-ToolkitVendor -Text $Name
+                Category       = "User Preference"
+                Recommendation = "Review / likely disable"
+                Risk           = "Low"
+                Reason         = "Matches user profile likelyDisable preference: $preference"
+            }
+        }
+    }
+
+    return $null
+}
+
 function Get-ToolkitRecommendation {
     param(
         [string]$Text,
-        [string]$Type = "general"
+        [string]$Type = "general",
+        [string]$Name = ""
     )
+
+    $profileRecommendation = Get-ToolkitProfileRecommendation -Name $Name
+
+    if ($profileRecommendation) {
+        return $profileRecommendation
+    }
 
     $specificFile = switch ($Type.ToLowerInvariant()) {
         "service"     { "Services.json" }

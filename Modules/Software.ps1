@@ -34,6 +34,7 @@ $findings = foreach ($item in $software) {
 
     $recommendation = Get-ToolkitRecommendation `
         -Text $text `
+        -Name $item.DisplayName `
         -Type "Software"
 
     $source = if ($item.PSPath) {

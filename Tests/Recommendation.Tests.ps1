@@ -191,3 +191,71 @@ Describe "Recommendation Rule Routing" {
             Should -Not -BeNullOrEmpty
     }
 }
+
+Describe "Profile Recommendation Boundaries" {
+
+    BeforeAll {
+        Import-Module "$Root\Core\Recommendation.psm1" -Force
+    }
+
+    It "keeps an exact alwaysKeep profile name" -ForEach @(
+        "OneDrive"
+        "Driver Easy"
+    ) {
+        $result = Get-ToolkitRecommendation `
+            -Name $_ `
+            -Text "Unrelated startup command" `
+            -Type "general"
+
+        $result.Recommendation |
+            Should -Be "KEEP"
+    }
+
+    It "does not apply profile preferences from unrelated <Type> text" -ForEach @(
+        "general"
+        "service"
+        "software"
+        "driver"
+    ) {
+        $result = Get-ToolkitRecommendation `
+            -Name "Contoso Startup Helper" `
+            -Text "C:\\Program Files\\OneDrive\\Driver Easy\\helper.exe" `
+            -Type $_
+
+        $result.Recommendation |
+            Should -Be "Review"
+    }
+
+    It "does not retain OneDrive or Driver Easy text rules" {
+        $ruleFiles = @(
+            "Rules.json"
+            "Software.json"
+        )
+
+        foreach ($ruleFile in $ruleFiles) {
+            $rules = @(
+                Get-Content "$Root\Data\$ruleFile" -Raw |
+                    ConvertFrom-Json
+            )
+
+            $rules.match |
+                Should -Not -Contain "OneDrive"
+
+            $rules.match |
+                Should -Not -Contain "Driver Easy"
+        }
+    }
+
+    It "does not apply a profile preference to a partial finding name" -ForEach @(
+        "OneDrive Helper"
+        "Driver Easy Updater"
+    ) {
+        $result = Get-ToolkitRecommendation `
+            -Name $_ `
+            -Text "Unrelated startup command" `
+            -Type "general"
+
+        $result.Recommendation |
+            Should -Be "Review"
+    }
+}
