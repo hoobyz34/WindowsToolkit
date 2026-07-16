@@ -14,7 +14,7 @@ WindowsToolkit is a modular Windows auditing and optimization platform focused o
 
 # Current Version
 
-v0.4.0
+v0.5.0
 
 ---
 

@@ -4,11 +4,11 @@
 
 v0.5.0
 
-## Goal
+## Release Status
 
-Add Safe Optimizer preflight validation and rollback-manifest generation.
+Optimizer preflight validation and rollback-manifest generation complete.
 
-## Active Tasks
+## Completed
 
 - [x] Read-only preflight validation
 - [x] Rollback-manifest generation
@@ -18,9 +18,9 @@ Add Safe Optimizer preflight validation and rollback-manifest generation.
 
 None
 
-## Next Commit
+## Release Commit
 
-Optimizer preflight and rollback manifests
+Finalize v0.5.0 release
 
 ## Definition of Done
 

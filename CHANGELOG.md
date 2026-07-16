@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.0
+
+### Added
+
+- Read-only optimization preflight validation with safety, state, privilege, restore-point readiness, and confirmation checks.
+- Stable rollback manifests with before-state snapshots, reversibility metadata, and CSV/JSON reports.
+
 ## v0.4.0
 
 ### Added
