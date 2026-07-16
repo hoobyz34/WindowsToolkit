@@ -14,7 +14,7 @@ WindowsToolkit is a modular Windows auditing and optimization platform focused o
 
 # Current Version
 
-v0.5.0
+v0.6.0
 
 ---
 
@@ -37,12 +37,13 @@ v0.5.0
 - [x] Safe Optimizer planning foundation
 - [x] Optimizer preflight validation and rollback manifests
 - [x] Gated Safe Optimizer executor
+- [x] Safe Optimizer executor security hardening
 
 ---
 
 # Current Sprint
 
-v0.6.0 Gated Safe Optimizer executor complete.
+v0.6.0 Gated Safe Optimizer executor and security hardening complete.
 
 ---
 

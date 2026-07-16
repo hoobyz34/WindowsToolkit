@@ -12,10 +12,10 @@ Describe "Version Module" {
     }
 
     It "returns the current release version" {
-        Get-ToolkitVersion | Should -Be "0.5.0"
+        Get-ToolkitVersion | Should -Be "0.6.0"
     }
 
     It "stores the version globally for the console header" {
-        $Global:ToolkitVersion | Should -Be "0.5.0"
+        $Global:ToolkitVersion | Should -Be "0.6.0"
     }
 }

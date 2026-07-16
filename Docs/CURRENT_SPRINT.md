@@ -6,7 +6,11 @@ v0.6.0
 
 ## Goal
 
-Add a gated Safe Optimizer executor with dry-run as the default.
+Add and harden a gated Safe Optimizer executor with dry-run as the default.
+
+## Release Status
+
+Gated Safe Optimizer executor and security hardening complete.
 
 ## Active Tasks
 
@@ -14,14 +18,15 @@ Add a gated Safe Optimizer executor with dry-run as the default.
 - [x] Dry-run, WhatIf, and confirmation gates
 - [x] Current preflight, live-state, and rollback-manifest validation
 - [x] Standardized execution audit reporting
+- [x] Deny-by-default artifact, policy, scope, and live-state hardening
 
 ## Blockers
 
 None
 
-## Next Commit
+## Release Commit
 
-Gated Safe Optimizer executor
+Finalize executor release
 
 ## Definition of Done
 

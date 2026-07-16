@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.0
+
+### Added
+
+- Gated Safe Optimizer executor with dry-run/WhatIf defaults, explicit Apply and confirmation gates, current-state and rollback-manifest validation, and standardized CSV/JSON audit records.
+- Deny-by-default executor hardening for forged or mismatched artifacts, protected components, policy integrity, HP scheduled-task scope, live-state drift, and conservative post-action reconciliation.
+
 ## v0.5.0
 
 ### Added
