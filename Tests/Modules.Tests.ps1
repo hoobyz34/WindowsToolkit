@@ -1,5 +1,3 @@
-$Root = Split-Path -Parent $PSScriptRoot
-
 $AnalyzerFiles = @(
     "Audit.ps1"
     "Services.ps1"
@@ -14,9 +12,14 @@ $AnalyzerFiles = @(
     "Dashboard.ps1"
     "Health.ps1"
     "Correlation.ps1"
+    "Optimizer.ps1"
 )
 
 Describe "Analyzer Module Integrity" {
+
+    BeforeAll {
+        $Root = Split-Path -Parent $PSScriptRoot
+    }
 
     It "Modules/<_> exists" -ForEach $AnalyzerFiles {
         Test-Path "$Root\Modules\$_" |
@@ -53,6 +56,7 @@ Describe "Analyzer Module Integrity" {
 Describe "Installed Software Analyzer Structure" {
 
     BeforeAll {
+        $Root = Split-Path -Parent $PSScriptRoot
         $SoftwareModulePath = "$Root\Modules\Software.ps1"
         $SoftwareModule = Get-Content `
             -Path $SoftwareModulePath `

@@ -1,0 +1,64 @@
+{
+  "protectedFindingPatterns": [
+    "Microsoft Defender",
+    "Windows Update",
+    "Microsoft Store",
+    "Windows Hello",
+    "OneDrive",
+    "Driver Easy"
+  ],
+  "protectedCategories": [
+    "Required"
+  ],
+  "protectedRisks": [
+    "Critical"
+  ],
+  "protectedAction": {
+    "id": "protected-retain",
+    "proposedAction": "Retain without optimization",
+    "confidence": "High",
+    "confirmationRequirement": "Explicit confirmation is required before any future system change; this protected item is not a change candidate.",
+    "planStatus": "Protected"
+  },
+  "actions": [
+    {
+      "id": "retain",
+      "recommendation": "KEEP",
+      "proposedAction": "Retain without optimization",
+      "confidence": "High",
+      "confirmationRequirement": "Explicit confirmation is required before any future system change.",
+      "planStatus": "Retain"
+    },
+    {
+      "id": "retain-review",
+      "recommendation": "KEEP / Review",
+      "proposedAction": "Retain and review dependencies",
+      "confidence": "Medium",
+      "confirmationRequirement": "Explicit confirmation is required before any future system change.",
+      "planStatus": "Pending Review"
+    },
+    {
+      "id": "review-likely-disable",
+      "recommendation": "Review / likely disable",
+      "proposedAction": "Review as a potential future optimization",
+      "confidence": "Medium",
+      "confirmationRequirement": "Explicit confirmation is required before any future system change.",
+      "planStatus": "Pending Review"
+    },
+    {
+      "id": "review",
+      "recommendation": "Review",
+      "proposedAction": "Review before considering any future optimization",
+      "confidence": "Low",
+      "confirmationRequirement": "Explicit confirmation is required before any future system change.",
+      "planStatus": "Pending Review"
+    }
+  ],
+  "defaultAction": {
+    "id": "review-unknown",
+    "proposedAction": "Review before considering any future optimization",
+    "confidence": "Low",
+    "confirmationRequirement": "Explicit confirmation is required before any future system change.",
+    "planStatus": "Pending Review"
+  }
+}

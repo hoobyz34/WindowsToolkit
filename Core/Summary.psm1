@@ -14,6 +14,7 @@ function Get-ToolkitReportFindings {
         "Inventory_Summary_Details.csv"
         "Health_Score.csv"
         "Correlation_Report.csv"
+        "Optimization_Plan.csv"
     )
 
     $findings = foreach (
@@ -117,8 +118,9 @@ function Get-ToolkitInventorySummary {
                 $_.Name -notin @(
                     "Inventory_Summary.csv"
                     "Inventory_Summary_Details.csv"
-        "Health_Score.csv"
-        "Correlation_Report.csv"
+                    "Health_Score.csv"
+                    "Correlation_Report.csv"
+                    "Optimization_Plan.csv"
                 )
             } |
             Sort-Object Name |

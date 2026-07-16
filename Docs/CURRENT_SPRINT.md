@@ -2,17 +2,15 @@
 
 ## Release
 
-v0.3.0
+v0.4.0
 
 ## Goal
 
-Complete the Inventory Engine.
+Build the Safe Optimizer planning foundation.
 
 ## Active Tasks
 
-- [x] HP Analyzer
-- [x] Installed Software Analyzer
-- [x] Driver Analyzer
+- [x] Safe Optimizer plan-only workflow
 
 ## Blockers
 
@@ -20,16 +18,16 @@ None
 
 ## Next Commit
 
-Release documentation reconciliation for v0.3.0
+Safe Optimizer planning foundation
 
 ## Definition of Done
 
-Inventory modules produce standardized Finding objects.
+Optimizer planning consumes standardized Finding objects.
 
-Recommendations come from JSON rules.
+Plan actions and safety boundaries come from JSON rules.
 
-Reports export correctly.
+CSV and JSON optimization plans export correctly.
 
 Git tag:
 
-v0.3.0
+v0.4.0

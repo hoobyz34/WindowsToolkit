@@ -110,6 +110,40 @@ function Save-JsonReport {
     return $path
 }
 
+function Save-ToolkitOptimizationPlanReports {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$Plan
+    )
+
+    if ($Plan.Count -gt 0) {
+        return [PSCustomObject]@{
+            CsvPath = Save-CsvReport -Name "Optimization_Plan" -Data $Plan
+            JsonPath = Save-JsonReport -Name "Optimization_Plan" -Data $Plan -Depth 10
+        }
+    }
+
+    $reportPath = Get-ToolkitReportPath
+    $csvPath = Join-Path $reportPath "Optimization_Plan.csv"
+    $jsonPath = Join-Path $reportPath "Optimization_Plan.json"
+    $columns = @(
+        "PlanId", "SourceFindingId", "SourceFinding", "ProposedAction",
+        "ActionId", "CurrentState", "Risk", "Reason", "Confidence",
+        "Category", "Vendor", "Recommendation", "Source", "ReportFile",
+        "RequiresConfirmation", "ConfirmationRequirement", "PlanStatus"
+    )
+
+    Set-Content -Path $csvPath -Value ($columns -join ",") -Encoding utf8
+    Set-Content -Path $jsonPath -Value "[]" -Encoding utf8
+
+    return [PSCustomObject]@{
+        CsvPath = $csvPath
+        JsonPath = $jsonPath
+    }
+}
+
 function Save-HtmlReport {
     [CmdletBinding()]
     param(
