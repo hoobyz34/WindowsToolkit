@@ -326,6 +326,70 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
             Should -Be (Get-ToolkitStableId -Prefix "BS" -Parts @($manifest.BeforeStateSnapshot))
     }
 
+    It "canonicalizes equivalent delayed-start off representations" {
+        $canonical = '{"Present":false,"Value":"0"}'
+        foreach ($representation in @(
+            $null,
+            0,
+            $false,
+            "0",
+            "false",
+            "null",
+            '{"Present":false,"Value":"0"}',
+            '{"Present":true,"Value":"0"}',
+            '{"Present":true,"Value":false}'
+        )) {
+            ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+                -Configuration $representation |
+                Should -Be $canonical
+        }
+    }
+
+    It "uses canonical delayed-start metadata in fresh plan and manifest hashes" {
+        $absent = New-TestServicePlanEntry `
+            -DelayedAutoStartConfiguration '{"Present":false,"Value":"0"}'
+        $zero = New-TestServicePlanEntry `
+            -DelayedAutoStartConfiguration '{"Present":true,"Value":"0"}'
+        $absentPreflight = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry $absent `
+            -Environment $ReadyEnvironment
+        $zeroPreflight = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry $zero `
+            -Environment $ReadyEnvironment
+        $absentManifest = ConvertTo-ToolkitRollbackManifestEntry `
+            -PlanEntry $absent `
+            -PreflightResult $absentPreflight
+        $zeroManifest = ConvertTo-ToolkitRollbackManifestEntry `
+            -PlanEntry $zero `
+            -PreflightResult $zeroPreflight
+
+        $absent.DelayedAutoStartConfiguration |
+            Should -Be '{"Present":false,"Value":"0"}'
+        $zero.DelayedAutoStartConfiguration |
+            Should -Be $absent.DelayedAutoStartConfiguration
+        $zero.SourceFindingId | Should -Be $absent.SourceFindingId
+        $zero.PlanId | Should -Be $absent.PlanId
+        $zeroManifest.BeforeStateSnapshot |
+            Should -Be $absentManifest.BeforeStateSnapshot
+        $zeroManifest.BeforeStateHash |
+            Should -Be $absentManifest.BeforeStateHash
+        $zeroManifest.ManifestId | Should -Be $absentManifest.ManifestId
+    }
+
+    It "rejects meaningful delayed-start drift and malformed metadata" {
+        foreach ($representation in @(
+            '{"Present":true,"Value":"1"}',
+            '{"Present":false,"Value":"1"}',
+            '{"Present":false,"Value":"0","Ignored":false}',
+            "2",
+            "not-json"
+        )) {
+            Test-ToolkitOptimizationDelayedAutoStartConfiguration `
+                -Json $representation |
+                Should -BeFalse
+        }
+    }
+
     It "blocks service candidates with incomplete rollback metadata" {
         $result = ConvertTo-ToolkitOptimizationPreflightResult `
             -PlanEntry (

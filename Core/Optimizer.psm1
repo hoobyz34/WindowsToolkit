@@ -352,6 +352,116 @@ function Test-ToolkitOptimizationRecoveryConfiguration {
     }
 }
 
+function ConvertTo-ToolkitOptimizationSwitchBoolean {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object]$Value
+    )
+
+    if ($null -eq $Value) {
+        return $false
+    }
+
+    if ($Value -is [bool]) {
+        return [bool]$Value
+    }
+
+    if ($Value -is [byte] -or
+        $Value -is [sbyte] -or
+        $Value -is [int16] -or
+        $Value -is [uint16] -or
+        $Value -is [int32] -or
+        $Value -is [uint32] -or
+        $Value -is [int64] -or
+        $Value -is [uint64]) {
+        if ([int64]$Value -eq 0) {
+            return $false
+        }
+        if ([int64]$Value -eq 1) {
+            return $true
+        }
+
+        throw "The switch value must be zero or one."
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        throw "The switch value is empty."
+    }
+
+    switch ($text.Trim().ToLowerInvariant()) {
+        "0" { return $false }
+        "false" { return $false }
+        "null" { return $false }
+        "1" { return $true }
+        "true" { return $true }
+        default { throw "The switch value is not a recognized boolean representation." }
+    }
+}
+
+function ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object]$Configuration
+    )
+
+    $parsed = $Configuration
+    if ($Configuration -is [string]) {
+        if ([string]::IsNullOrWhiteSpace([string]$Configuration)) {
+            throw "The delayed-start configuration is empty."
+        }
+
+        $parsed = [string]$Configuration |
+            ConvertFrom-Json -ErrorAction Stop
+    }
+
+    $presentProperty = if ($null -eq $parsed) {
+        $null
+    }
+    else {
+        $parsed.PSObject.Properties["Present"]
+    }
+    $valueProperty = if ($null -eq $parsed) {
+        $null
+    }
+    else {
+        $parsed.PSObject.Properties["Value"]
+    }
+
+    if ($null -ne $presentProperty -or $null -ne $valueProperty) {
+        if ($null -eq $presentProperty -or $null -eq $valueProperty) {
+            throw "The delayed-start configuration must contain Present and Value."
+        }
+
+        $propertyNames = @($parsed.PSObject.Properties.Name)
+        if (
+            $propertyNames.Count -ne 2 -or
+            "Present" -notin $propertyNames -or
+            "Value" -notin $propertyNames
+        ) {
+            throw "The delayed-start configuration contains unexpected fields."
+        }
+
+        $present = ConvertTo-ToolkitOptimizationSwitchBoolean `
+            -Value $presentProperty.Value
+        $enabledValue = ConvertTo-ToolkitOptimizationSwitchBoolean `
+            -Value $valueProperty.Value
+        if (-not $present -and $enabledValue) {
+            throw "An absent delayed-start value cannot be enabled."
+        }
+
+        $enabled = $present -and $enabledValue
+    }
+    else {
+        $enabled = ConvertTo-ToolkitOptimizationSwitchBoolean -Value $parsed
+    }
+
+    return [ordered]@{
+        Present = [bool]$enabled
+        Value   = if ($enabled) { "1" } else { "0" }
+    } | ConvertTo-Json -Compress
+}
+
 function Test-ToolkitOptimizationDelayedAutoStartConfiguration {
     [CmdletBinding()]
     param(
@@ -365,14 +475,15 @@ function Test-ToolkitOptimizationDelayedAutoStartConfiguration {
     )
 
     try {
-        $configuration = $Json | ConvertFrom-Json -ErrorAction Stop
-        return (
-            $null -ne $configuration.PSObject.Properties["Present"] -and
-            $null -ne $configuration.PSObject.Properties["Value"] -and
-            $configuration.Present -is [bool] -and
-            [bool]$configuration.Present -eq $ExpectedPresent -and
-            [string]$configuration.Value -eq $ExpectedValue
-        )
+        $actual = ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+            -Configuration $Json
+        $expected = ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+            -Configuration ([PSCustomObject]@{
+                Present = $ExpectedPresent
+                Value   = $ExpectedValue
+            })
+
+        return $actual -ceq $expected
     }
     catch {
         return $false
@@ -932,6 +1043,20 @@ function Get-ToolkitOptimizationSourceIdentityParts {
         $parts.Add($value)
     }
 
+    $delayedAutoStartConfiguration = Get-ToolkitFindingPropertyValue `
+        -Finding $Finding `
+        -Name "DelayedAutoStartConfiguration"
+    if (-not [string]::IsNullOrWhiteSpace($delayedAutoStartConfiguration)) {
+        try {
+            $delayedAutoStartConfiguration = `
+                ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+                    -Configuration $delayedAutoStartConfiguration
+        }
+        catch {
+            # Preserve invalid input so identity hashing cannot hide metadata drift.
+        }
+    }
+
     $serviceValues = @(
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceName"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceDisplayName"
@@ -939,7 +1064,7 @@ function Get-ToolkitOptimizationSourceIdentityParts {
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServicePath"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceStartName"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceType"
-        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DelayedAutoStartConfiguration"
+        $delayedAutoStartConfiguration
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Dependencies"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DependentServices"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutablePath"
@@ -1121,6 +1246,19 @@ function ConvertTo-ToolkitOptimizationPlanEntry {
         -Parts (Get-ToolkitOptimizationSourceIdentityParts -Finding $Finding)
     $planId = Get-ToolkitStableId -Prefix "OP" -Parts @($sourceFindingId, [string]$action.id)
     $confidence = Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Confidence" -Default ([string]$action.confidence)
+    $delayedAutoStartConfiguration = Get-ToolkitFindingPropertyValue `
+        -Finding $Finding `
+        -Name "DelayedAutoStartConfiguration"
+    if (-not [string]::IsNullOrWhiteSpace($delayedAutoStartConfiguration)) {
+        try {
+            $delayedAutoStartConfiguration = `
+                ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+                    -Configuration $delayedAutoStartConfiguration
+        }
+        catch {
+            # Keep invalid input visible so preflight denies it precisely.
+        }
+    }
 
     return New-ToolkitOptimizationPlanEntry `
         -PlanId $planId `
@@ -1146,7 +1284,7 @@ function ConvertTo-ToolkitOptimizationPlanEntry {
         -ServicePath (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServicePath") `
         -ServiceStartName (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceStartName") `
         -ServiceType (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceType") `
-        -DelayedAutoStartConfiguration (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DelayedAutoStartConfiguration") `
+        -DelayedAutoStartConfiguration $delayedAutoStartConfiguration `
         -Dependencies (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Dependencies") `
         -DependentServices (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DependentServices") `
         -ExecutablePath (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutablePath") `
@@ -1412,6 +1550,21 @@ function ConvertTo-ToolkitRollbackManifestEntry {
     $actionPolicy = Get-ToolkitOptimizationActionPolicy -ActionId $actionId -Rules $Rules
     $operationProfile = Get-ToolkitOptimizationOperationProfile -SourceType $sourceType -Rules $Rules
     $isCandidate = [bool]$actionPolicy.preflight.isCandidate
+    $delayedAutoStartProperty = `
+        $PlanEntry.PSObject.Properties["DelayedAutoStartConfiguration"]
+    $delayedAutoStartConfiguration = ""
+    if ($null -ne $delayedAutoStartProperty) {
+        try {
+            $delayedAutoStartConfiguration = `
+                ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+                    -Configuration $delayedAutoStartProperty.Value
+        }
+        catch {
+            $delayedAutoStartConfiguration = `
+                [string]$delayedAutoStartProperty.Value
+        }
+    }
+
     $beforeState = [ordered]@{
         CurrentState   = $currentState
         SourceName     = $sourceName
@@ -1429,7 +1582,7 @@ function ConvertTo-ToolkitRollbackManifestEntry {
         ServicePath    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServicePath"
         ServiceStartName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceStartName"
         ServiceType    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceType"
-        DelayedAutoStartConfiguration = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "DelayedAutoStartConfiguration"
+        DelayedAutoStartConfiguration = $delayedAutoStartConfiguration
         Dependencies   = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Dependencies"
         DependentServices = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "DependentServices"
         ExecutablePath = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ExecutablePath"

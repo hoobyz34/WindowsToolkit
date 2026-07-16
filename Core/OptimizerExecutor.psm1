@@ -260,10 +260,21 @@ function Test-ToolkitExecutorServiceSafetyMetadataMatch {
         [Parameter(Mandatory)][object]$ExecutionPolicy
     )
 
-    $dependencies = ConvertFrom-ToolkitOptimizationStringArray `
-        -Json ([string]$CurrentObject.Dependencies)
-    $dependentServices = ConvertFrom-ToolkitOptimizationStringArray `
-        -Json ([string]$CurrentObject.DependentServices)
+    try {
+        $dependencies = ConvertFrom-ToolkitOptimizationStringArray `
+            -Json ([string]$CurrentObject.Dependencies)
+        $dependentServices = ConvertFrom-ToolkitOptimizationStringArray `
+            -Json ([string]$CurrentObject.DependentServices)
+        $currentDelayedAutoStart = `
+            ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+                -Configuration $CurrentObject.DelayedAutoStartConfiguration
+        $referenceDelayedAutoStart = `
+            ConvertTo-ToolkitOptimizationDelayedAutoStartConfiguration `
+                -Configuration $ReferenceObject.DelayedAutoStartConfiguration
+    }
+    catch {
+        return $false
+    }
 
     return (
         (Test-ToolkitExecutionStringEquals $CurrentObject.Name $ExecutionPolicy.ServiceName) -and
@@ -276,10 +287,9 @@ function Test-ToolkitExecutorServiceSafetyMetadataMatch {
         (Test-ToolkitExecutionStringEquals $CurrentObject.ServiceStartName $ExecutionPolicy.ServiceStartName) -and
         (Test-ToolkitExecutionStringEquals $CurrentObject.ServiceType $ReferenceObject.ServiceType) -and
         (Test-ToolkitExecutionStringEquals $CurrentObject.ServiceType $ExecutionPolicy.ServiceType) -and
-        [string]$CurrentObject.DelayedAutoStartConfiguration -ceq
-            [string]$ReferenceObject.DelayedAutoStartConfiguration -and
+        $currentDelayedAutoStart -ceq $referenceDelayedAutoStart -and
         (Test-ToolkitOptimizationDelayedAutoStartConfiguration `
-            ([string]$CurrentObject.DelayedAutoStartConfiguration)) -and
+            $currentDelayedAutoStart) -and
         (Test-ToolkitOptimizationCollectionSetEquals `
             $dependencies `
             $ExecutionPolicy.RequiredDependencies) -and

@@ -225,8 +225,18 @@ Describe "Gated Safe Optimizer Executor" {
             }
 
             [PSCustomObject]@{
-                Name                  = "HpTouchpointAnalyticsService"
-                DisplayName           = "HP Insights Analytics"
+                Name                  = if ($state.Name) {
+                    $state.Name
+                }
+                else {
+                    "HpTouchpointAnalyticsService"
+                }
+                DisplayName           = if ($state.DisplayName) {
+                    $state.DisplayName
+                }
+                else {
+                    "HP Insights Analytics"
+                }
                 PathName              = if ($state.ServicePath) {
                     $state.ServicePath
                 }
@@ -697,6 +707,45 @@ Describe "Gated Safe Optimizer Executor" {
         Should -Invoke Disable-ScheduledTask `
             -ModuleName OptimizerExecutor `
             -Times 0
+    }
+
+    It "treats the post-execution present-zero delayed-start value as unchanged" {
+        $artifacts = New-TestServiceExecutionArtifacts `
+            -DelayedAutoStartConfiguration '{"Present":false,"Value":"0"}'
+        $Global:ToolkitExecutorServiceStates.Clear()
+        @(
+            [PSCustomObject]@{
+                State                         = "Running"
+                StartupType                   = "Automatic"
+                DelayedAutoStartConfiguration = '{"Present":false,"Value":"0"}'
+            }
+            [PSCustomObject]@{
+                State                         = "Running"
+                StartupType                   = "Automatic"
+                DelayedAutoStartConfiguration = '{"Present":false,"Value":"0"}'
+            }
+            [PSCustomObject]@{
+                State                         = "Stopped"
+                StartupType                   = "Disabled"
+                DelayedAutoStartConfiguration = '{"Present":true,"Value":"0"}'
+            }
+        ) | ForEach-Object {
+            $Global:ToolkitExecutorServiceStates.Enqueue($_)
+        }
+
+        $result = Invoke-ToolkitOptimizationExecutor `
+            -PlanEntries @($artifacts.Plan) `
+            -PreflightResults @($artifacts.Preflight) `
+            -RollbackManifest @($artifacts.Manifest) `
+            -Apply `
+            -Confirmed `
+            -Confirm:$false
+
+        $result.Status | Should -Be "Executed"
+        $result.DecisionCode | Should -Be "Executed"
+        $result.RollbackStatus | Should -Be "Available"
+        Should -Invoke Stop-Service -ModuleName OptimizerExecutor -Times 1
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 1
     }
 
     It "honors WhatIf for the exact service and invokes no mutation" {
@@ -1201,6 +1250,48 @@ Describe "Gated Safe Optimizer Executor" {
         Should -Invoke Remove-ItemProperty -ModuleName OptimizerExecutor -Times 0
     }
 
+    It "accepts a legacy absent-value manifest when live delayed-start is present zero" {
+        $artifacts = New-TestServiceExecutionArtifacts `
+            -DelayedAutoStartConfiguration '{"Present":false,"Value":"0"}'
+        $execution = New-TestServiceExecutionResult `
+            -Artifacts $artifacts `
+            -Status "Indeterminate" `
+            -RollbackStatus "Required - Not Executed"
+        $Global:ToolkitExecutorServiceStates.Clear()
+        $Global:ToolkitExecutorServiceStates.Enqueue(
+            [PSCustomObject]@{
+                State                         = "Stopped"
+                StartupType                   = "Disabled"
+                DelayedAutoStartConfiguration = '{"Present":true,"Value":"0"}'
+            }
+        )
+
+        $legacySnapshot = $artifacts.Manifest.BeforeStateSnapshot |
+            ConvertFrom-Json
+        $legacySnapshot.DelayedAutoStartConfiguration |
+            Should -Be '{"Present":false,"Value":"0"}'
+        $artifacts.Manifest.BeforeStateHash |
+            Should -Be (
+                Get-ToolkitStableId `
+                    -Prefix "BS" `
+                    -Parts @($artifacts.Manifest.BeforeStateSnapshot)
+            )
+
+        $result = Invoke-ToolkitOptimizationRollback `
+            -PlanEntry $artifacts.Plan `
+            -PreflightResult $artifacts.Preflight `
+            -RollbackManifest $artifacts.Manifest `
+            -ExecutionResult $execution
+
+        $result.Status | Should -Be "Preview"
+        $result.DecisionCode | Should -Be "RollbackApplyRequired"
+        $result.RollbackStatus | Should -Be "Available"
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Start-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke New-ItemProperty -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Remove-ItemProperty -ModuleName OptimizerExecutor -Times 0
+    }
+
     It "honors WhatIf for rollback and invokes no mutation" {
         $artifacts = New-TestServiceExecutionArtifacts
         $execution = New-TestServiceExecutionResult -Artifacts $artifacts
@@ -1361,6 +1452,57 @@ Describe "Gated Safe Optimizer Executor" {
         $result.DecisionCode | Should -Be "RollbackValidationFailed"
         Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 0
         Should -Invoke Start-Service -ModuleName OptimizerExecutor -Times 0
+    }
+
+    It "still blocks identity, dependency, recovery, and state drift during rollback" -ForEach @(
+        @{
+            LiveState = [PSCustomObject]@{
+                State       = "Stopped"
+                StartupType = "Disabled"
+                Name        = "EventLog"
+            }
+        }
+        @{
+            LiveState = [PSCustomObject]@{
+                State        = "Stopped"
+                StartupType  = "Disabled"
+                Dependencies = '["rpcss"]'
+            }
+        }
+        @{
+            LiveState = [PSCustomObject]@{
+                State                 = "Stopped"
+                StartupType           = "Disabled"
+                RecoveryConfiguration = '{"FailureActionsPresent":false,"FailureActionsBase64":"","FailureActionsOnNonCrashFailuresPresent":false,"FailureActionsOnNonCrashFailures":"","FailureCommandPresent":false,"FailureCommand":"","RebootMessagePresent":false,"RebootMessage":""}'
+            }
+        }
+        @{
+            LiveState = [PSCustomObject]@{
+                State       = "Paused"
+                StartupType = "Disabled"
+            }
+        }
+    ) {
+        $artifacts = New-TestServiceExecutionArtifacts
+        $execution = New-TestServiceExecutionResult -Artifacts $artifacts
+        $Global:ToolkitExecutorServiceStates.Clear()
+        $Global:ToolkitExecutorServiceStates.Enqueue($LiveState)
+
+        $result = Invoke-ToolkitOptimizationRollback `
+            -PlanEntry $artifacts.Plan `
+            -PreflightResult $artifacts.Preflight `
+            -RollbackManifest $artifacts.Manifest `
+            -ExecutionResult $execution `
+            -Apply `
+            -Confirmed `
+            -Confirm:$false
+
+        $result.Status | Should -Be "Denied"
+        $result.DecisionCode | Should -Be "RollbackValidationFailed"
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Start-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke New-ItemProperty -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Remove-ItemProperty -ModuleName OptimizerExecutor -Times 0
     }
 
     It "denies altered rollback snapshots and mismatched execution audits" {

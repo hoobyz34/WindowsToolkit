@@ -96,6 +96,8 @@ Describe "Service Discovery and Reporting" {
     }
 
     It "reports exact service identity and reversible snapshot fields" {
+        Mock Import-Module {}
+
         & "$Root\Modules\Services.ps1"
 
         $finding = $Global:ServiceAnalyzerFindings |
