@@ -14,7 +14,7 @@ WindowsToolkit is a modular Windows auditing and optimization platform focused o
 
 # Current Version
 
-v0.3.0
+v0.4.0
 
 ---
 
@@ -34,12 +34,13 @@ v0.3.0
 - [x] Driver Analyzer
 - [x] HP Analyzer
 - [x] Inventory Engine standardization
+- [x] Safe Optimizer planning foundation
 
 ---
 
 # Current Sprint
 
-v0.3.0 Inventory Engine complete.
+v0.4.0 Safe Optimizer planning foundation complete.
 
 ---
 
@@ -67,8 +68,7 @@ v0.3.0 Inventory Engine complete.
 
 ## Optimization
 
-- Safe Service Changes
-- Startup Optimization
+- Confirmed optimization apply workflow
 - Restore Points
 - Rollback
 

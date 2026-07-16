@@ -4,11 +4,11 @@
 
 v0.4.0
 
-## Goal
+## Release Status
 
-Build the Safe Optimizer planning foundation.
+Safe Optimizer planning foundation complete.
 
-## Active Tasks
+## Completed
 
 - [x] Safe Optimizer plan-only workflow
 
@@ -16,9 +16,9 @@ Build the Safe Optimizer planning foundation.
 
 None
 
-## Next Commit
+## Release Commit
 
-Safe Optimizer planning foundation
+Finalize v0.4.0 release
 
 ## Definition of Done
 

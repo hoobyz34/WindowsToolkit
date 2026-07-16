@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.0
+
+### Added
+
+- Safe Optimizer plan-only workflow that converts standardized findings into deterministic, confirmation-required plan entries.
+- JSON-driven optimization action and protected-item policy with CSV and JSON plan reports.
+
 ## v0.3.0
 
 ### Added
