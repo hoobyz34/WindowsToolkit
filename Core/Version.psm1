@@ -1,4 +1,4 @@
-$Global:ToolkitVersion = "0.6.0"
+$Global:ToolkitVersion = "0.7.0"
 
 function Get-ToolkitVersion {
     return $Global:ToolkitVersion

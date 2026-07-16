@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.0
+
+### Added
+
+- Added a narrowly scoped, JSON-allowlisted reversible action for the exact `HpTouchpointAnalyticsService` (`HP Insights Analytics`) service.
+- Added strict service identity, vendor/binary signature, dependency, recovery, live-state, manifest, privilege, confirmation, and rollback validation; dry-run remains the default and all other action types remain denied.
+
 ## v0.6.0
 
 ### Added
