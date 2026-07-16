@@ -100,8 +100,20 @@ function Get-ToolkitVendor {
     $vendors = Get-ToolkitDataFile -FileName "Vendors.json"
 
     foreach ($vendor in $vendors) {
+        $matchMode = if ($vendor.matchMode) {
+            [string]$vendor.matchMode
+        }
+        else {
+            "contains"
+        }
+
         foreach ($pattern in $vendor.patterns) {
-            if ($Text -match [regex]::Escape($pattern)) {
+            if (
+                Test-ToolkitRuleTextMatch `
+                    -Text $Text `
+                    -Pattern ([string]$pattern) `
+                    -Mode $matchMode
+            ) {
                 return $vendor.name
             }
         }

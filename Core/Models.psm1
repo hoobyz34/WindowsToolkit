@@ -28,7 +28,17 @@ function New-ToolkitFinding {
         [string]$ServiceName = "",
         [string]$ServiceDisplayName = "",
         [string]$StartupType = "",
+        [string]$ServicePath = "",
+        [string]$ServiceStartName = "",
+        [string]$ServiceType = "",
+        [string]$DelayedAutoStartConfiguration = "",
         [string]$Dependencies = "",
+        [string]$DependentServices = "",
+        [string]$ExecutablePath = "",
+        [string]$ExecutableCompany = "",
+        [string]$ExecutableProduct = "",
+        [string]$ExecutableSignatureStatus = "",
+        [string]$ExecutableSignerSubject = "",
         [string]$RecoveryConfiguration = ""
     )
 
@@ -46,7 +56,17 @@ function New-ToolkitFinding {
         ServiceName    = $ServiceName
         ServiceDisplayName = $ServiceDisplayName
         StartupType    = $StartupType
+        ServicePath    = $ServicePath
+        ServiceStartName = $ServiceStartName
+        ServiceType    = $ServiceType
+        DelayedAutoStartConfiguration = $DelayedAutoStartConfiguration
         Dependencies   = $Dependencies
+        DependentServices = $DependentServices
+        ExecutablePath = $ExecutablePath
+        ExecutableCompany = $ExecutableCompany
+        ExecutableProduct = $ExecutableProduct
+        ExecutableSignatureStatus = $ExecutableSignatureStatus
+        ExecutableSignerSubject = $ExecutableSignerSubject
         RecoveryConfiguration = $RecoveryConfiguration
     }
 }
@@ -74,7 +94,17 @@ function New-ToolkitOptimizationPlanEntry {
         [string]$ServiceName = "",
         [string]$ServiceDisplayName = "",
         [string]$StartupType = "",
+        [string]$ServicePath = "",
+        [string]$ServiceStartName = "",
+        [string]$ServiceType = "",
+        [string]$DelayedAutoStartConfiguration = "",
         [string]$Dependencies = "",
+        [string]$DependentServices = "",
+        [string]$ExecutablePath = "",
+        [string]$ExecutableCompany = "",
+        [string]$ExecutableProduct = "",
+        [string]$ExecutableSignatureStatus = "",
+        [string]$ExecutableSignerSubject = "",
         [string]$RecoveryConfiguration = "",
         [Parameter(Mandatory)][bool]$RequiresConfirmation,
         [Parameter(Mandatory)][string]$ConfirmationRequirement,
@@ -102,7 +132,17 @@ function New-ToolkitOptimizationPlanEntry {
         ServiceName             = $ServiceName
         ServiceDisplayName      = $ServiceDisplayName
         StartupType             = $StartupType
+        ServicePath             = $ServicePath
+        ServiceStartName        = $ServiceStartName
+        ServiceType             = $ServiceType
+        DelayedAutoStartConfiguration = $DelayedAutoStartConfiguration
         Dependencies            = $Dependencies
+        DependentServices       = $DependentServices
+        ExecutablePath          = $ExecutablePath
+        ExecutableCompany       = $ExecutableCompany
+        ExecutableProduct       = $ExecutableProduct
+        ExecutableSignatureStatus = $ExecutableSignatureStatus
+        ExecutableSignerSubject = $ExecutableSignerSubject
         RecoveryConfiguration   = $RecoveryConfiguration
         RequiresConfirmation    = $RequiresConfirmation
         ConfirmationRequirement = $ConfirmationRequirement

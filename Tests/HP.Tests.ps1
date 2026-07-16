@@ -170,6 +170,24 @@ Describe "HP Analyzer" {
         $driver.Source | Should -Be "Source unavailable"
     }
 
+    It "does not admit ELAN as an HP source through a LAN substring collision" {
+        Mock Get-ToolkitServices {
+            [PSCustomObject]@{
+                Name        = "ELANTouchpadService"
+                DisplayName = "ELAN Touchpad Component"
+                PathName    = "C:\Windows\System32\ELAN.exe"
+                State       = "Running"
+            }
+        }
+        Mock Get-ToolkitInstalledSoftware { @() }
+        Mock Get-ToolkitDrivers { @() }
+        Mock Get-ToolkitScheduledTasks { @() }
+
+        & "$Root\Modules\HP.ps1"
+
+        $Global:HPAnalyzerReportedFindings.Count | Should -Be 0
+    }
+
     It "uses a valid HP JSON rule file" {
         Test-Path "$Root\Data\HP.json" | Should -BeTrue
 

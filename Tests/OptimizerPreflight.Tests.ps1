@@ -57,7 +57,16 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
                 [string]$StartupType = "Automatic",
                 [string]$State = "Running",
                 [string]$Dependencies = '["ProfSvc","rpcss"]',
-                [string]$RecoveryConfiguration = '{"FailureActionsPresent":true,"FailureActionsBase64":"AQIDBA==","FailureActionsOnNonCrashFailures":"1"}'
+                [string]$DependentServices = '[]',
+                [string]$ServicePath = "C:\Windows\System32\DriverStore\FileRepository\hpanalyticscomp.inf_test\x64\TouchpointAnalyticsClientService.exe",
+                [string]$ServiceStartName = "LocalSystem",
+                [string]$ServiceType = "Own Process",
+                [string]$DelayedAutoStartConfiguration = '{"Present":false,"Value":"0"}',
+                [string]$ExecutableCompany = "HP Inc.",
+                [string]$ExecutableProduct = "HP Insights Analytics",
+                [string]$ExecutableSignatureStatus = "Valid",
+                [string]$ExecutableSignerSubject = "CN=Microsoft Windows Hardware Compatibility Publisher, O=Microsoft Corporation",
+                [string]$RecoveryConfiguration = '{"FailureActionsPresent":true,"FailureActionsBase64":"gFEBAAEAAAABAAAAAwAAABQAAAABAAAAMHUAAAEAAABg6gAAAQAAAJBfAQA=","FailureActionsOnNonCrashFailuresPresent":false,"FailureActionsOnNonCrashFailures":"","FailureCommandPresent":false,"FailureCommand":"","RebootMessagePresent":false,"RebootMessage":""}'
             )
 
             $finding = New-ToolkitFinding `
@@ -73,7 +82,17 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
                 -ServiceName $ServiceName `
                 -ServiceDisplayName $DisplayName `
                 -StartupType $StartupType `
+                -ServicePath $ServicePath `
+                -ServiceStartName $ServiceStartName `
+                -ServiceType $ServiceType `
+                -DelayedAutoStartConfiguration $DelayedAutoStartConfiguration `
                 -Dependencies $Dependencies `
+                -DependentServices $DependentServices `
+                -ExecutablePath $ServicePath `
+                -ExecutableCompany $ExecutableCompany `
+                -ExecutableProduct $ExecutableProduct `
+                -ExecutableSignatureStatus $ExecutableSignatureStatus `
+                -ExecutableSignerSubject $ExecutableSignerSubject `
                 -RecoveryConfiguration $RecoveryConfiguration
             $finding |
                 Add-Member `
@@ -290,6 +309,17 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
         $snapshot.StartupType | Should -Be "Automatic"
         $snapshot.CurrentState | Should -Be "Running"
         $snapshot.Dependencies | Should -Be '["ProfSvc","rpcss"]'
+        $snapshot.DependentServices | Should -Be '[]'
+        $snapshot.ServiceStartName | Should -Be "LocalSystem"
+        $snapshot.ServiceType | Should -Be "Own Process"
+        $snapshot.ServicePath | Should -Be $snapshot.ExecutablePath
+        $snapshot.ExecutableCompany | Should -Be "HP Inc."
+        $snapshot.ExecutableProduct | Should -Be "HP Insights Analytics"
+        $snapshot.ExecutableSignatureStatus | Should -Be "Valid"
+        $snapshot.ExecutableSignerSubject |
+            Should -Match "Microsoft Windows Hardware Compatibility Publisher"
+        $snapshot.DelayedAutoStartConfiguration |
+            Should -Match '"Present":false'
         $snapshot.RecoveryConfiguration |
             Should -Match "FailureActionsBase64"
         $manifest.BeforeStateHash |
@@ -330,6 +360,67 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
 
         $result.IsEligible | Should -BeFalse
         $result.SafetyPolicyResult | Should -Be "Blocked - Executor Policy"
+    }
+
+    It "blocks wildcard, alias, or path-like service identities" -ForEach @(
+        @{ ServiceName = "HpTouchpoint*" }
+        @{ ServiceName = "HpTouchpointAnalyticsService\..\EventLog" }
+        @{ ServiceName = "EventLog" }
+    ) {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestServicePlanEntry `
+                    -ServiceName $ServiceName
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult |
+            Should -Match "Blocked - Executor"
+    }
+
+    It "blocks missing, unexpected, or dependent service relationships" -ForEach @(
+        @{ Dependencies = ""; DependentServices = '[]' }
+        @{ Dependencies = '["rpcss"]'; DependentServices = '[]' }
+        @{ Dependencies = '["ProfSvc","rpcss"]'; DependentServices = '["OtherService"]' }
+        @{ Dependencies = '["ProfSvc","rpcss"]'; DependentServices = "not-json" }
+    ) {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestServicePlanEntry `
+                    -Dependencies $Dependencies `
+                    -DependentServices $DependentServices
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult |
+            Should -Match "Blocked - Executor"
+    }
+
+    It "blocks missing or altered service provenance and recovery metadata" -ForEach @(
+        @{ Parameter = "ServiceStartName"; Value = "LocalService" }
+        @{ Parameter = "ServiceType"; Value = "Share Process" }
+        @{ Parameter = "ExecutableCompany"; Value = "Contoso" }
+        @{ Parameter = "ExecutableProduct"; Value = "HP Insights Analytics Helper" }
+        @{ Parameter = "ExecutableSignatureStatus"; Value = "NotSigned" }
+        @{ Parameter = "ExecutableSignerSubject"; Value = "CN=Contoso" }
+        @{ Parameter = "ServicePath"; Value = "C:\Windows\System32\svchost.exe" }
+        @{ Parameter = "DelayedAutoStartConfiguration"; Value = "" }
+        @{ Parameter = "RecoveryConfiguration"; Value = '{"FailureActionsPresent":true,"FailureActionsBase64":"not-base64"}' }
+        @{ Parameter = "RecoveryConfiguration"; Value = '{"FailureActionsPresent":true,"FailureActionsBase64":"AQIDBA==","FailureActionsOnNonCrashFailuresPresent":false,"FailureActionsOnNonCrashFailures":"","FailureCommandPresent":false,"FailureCommand":"","RebootMessagePresent":false,"RebootMessage":""}' }
+        @{ Parameter = "RecoveryConfiguration"; Value = '{"FailureActionsPresent":true,"FailureActionsBase64":"gFEBAAEAAAABAAAAAwAAABQAAAABAAAAMHUAAAEAAABg6gAAAQAAAJBfAQA=","FailureActionsOnNonCrashFailuresPresent":false,"FailureActionsOnNonCrashFailures":"","FailureCommandPresent":true,"FailureCommand":"cmd.exe /c whoami","RebootMessagePresent":false,"RebootMessage":""}' }
+    ) {
+        $parameters = @{
+            $Parameter = $Value
+        }
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (New-TestServicePlanEntry @parameters) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult |
+            Should -Match "Blocked - Executor"
     }
 
     It "reports unavailable restore-point readiness without creating one" {

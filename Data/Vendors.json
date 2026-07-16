@@ -9,6 +9,7 @@
   {
     "name": "HP",
     "patterns": ["HP", "Hewlett", "Wolf", "Sure", "Touchpoint", "Insights"],
+    "matchMode": "word",
     "defaultRisk": "Medium",
     "defaultRecommendation": "Review",
     "reason": "HP/OEM component; some are useful and some are telemetry or support tools."

@@ -150,6 +150,23 @@ Describe "Vendor Rule Schema" {
                 Should -BeGreaterThan 0
         }
     }
+
+    It "every explicit vendor match mode is supported" {
+        foreach ($vendor in $script:VendorRules) {
+            if ($vendor.matchMode) {
+                [string]$vendor.matchMode |
+                    Should -BeIn @("contains", "exact", "word")
+            }
+        }
+    }
+
+    It "does not classify ELAN or embedded HP text as vendor HP" -ForEach @(
+        "ELAN Touchpad Component",
+        "MyPHPService",
+        "AlphaHPBeta"
+    ) {
+        Get-ToolkitVendor -Text $_ | Should -Not -Be "HP"
+    }
 }
 
 Describe "Recommendation Rule Routing" {

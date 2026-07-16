@@ -158,7 +158,11 @@ function Save-ToolkitOptimizationPlanReports {
         "CurrentState", "Risk", "Reason", "Confidence", "Category", "Vendor",
         "Recommendation", "Source", "ReportFile", "RequiresConfirmation",
         "ConfirmationRequirement", "PlanStatus", "ServiceName",
-        "ServiceDisplayName", "StartupType", "Dependencies",
+        "ServiceDisplayName", "StartupType", "ServicePath",
+        "ServiceStartName", "ServiceType", "DelayedAutoStartConfiguration",
+        "Dependencies", "DependentServices", "ExecutablePath",
+        "ExecutableCompany", "ExecutableProduct",
+        "ExecutableSignatureStatus", "ExecutableSignerSubject",
         "RecoveryConfiguration"
     )
 

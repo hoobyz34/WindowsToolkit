@@ -15,9 +15,19 @@ $findings = foreach ($service in Get-ToolkitServices) {
     $recommendation = Get-ToolkitRecommendation `
         -Text $text `
         -Type service
+    $serviceSnapshot = if (
+        $recommendation.Recommendation -eq "Review / likely disable"
+    ) {
+        Get-ToolkitServiceInventoryRecord `
+            -Name $service.Name `
+            -IncludeExecutableIdentity
+    }
+    else {
+        $service
+    }
 
     New-ToolkitFinding `
-        -Name $service.DisplayName `
+        -Name $serviceSnapshot.DisplayName `
         -Type "Service" `
         -Vendor $recommendation.Vendor `
         -Category $recommendation.Category `
@@ -26,12 +36,22 @@ $findings = foreach ($service in Get-ToolkitServices) {
         -Reason $recommendation.Reason `
         -Source "Windows Service" `
         -Version "" `
-        -State $service.State `
-        -ServiceName $service.Name `
-        -ServiceDisplayName $service.DisplayName `
-        -StartupType $service.StartupType `
-        -Dependencies $service.Dependencies `
-        -RecoveryConfiguration $service.RecoveryConfiguration
+        -State $serviceSnapshot.State `
+        -ServiceName $serviceSnapshot.Name `
+        -ServiceDisplayName $serviceSnapshot.DisplayName `
+        -StartupType $serviceSnapshot.StartupType `
+        -ServicePath $serviceSnapshot.PathName `
+        -ServiceStartName $serviceSnapshot.StartName `
+        -ServiceType $serviceSnapshot.ServiceType `
+        -DelayedAutoStartConfiguration $serviceSnapshot.DelayedAutoStartConfiguration `
+        -Dependencies $serviceSnapshot.Dependencies `
+        -DependentServices $serviceSnapshot.DependentServices `
+        -ExecutablePath $serviceSnapshot.ExecutablePath `
+        -ExecutableCompany $serviceSnapshot.ExecutableCompany `
+        -ExecutableProduct $serviceSnapshot.ExecutableProduct `
+        -ExecutableSignatureStatus $serviceSnapshot.ExecutableSignatureStatus `
+        -ExecutableSignerSubject $serviceSnapshot.ExecutableSignerSubject `
+        -RecoveryConfiguration $serviceSnapshot.RecoveryConfiguration
 }
 
 Save-CsvReport `

@@ -55,12 +55,32 @@ function Get-ToolkitOptimizationServiceExecutorContract {
         AllowedStartupTypes   = @("Automatic")
         ServiceName           = "HpTouchpointAnalyticsService"
         ServiceDisplayName    = "HP Insights Analytics"
+        RequiredDependencies  = @("ProfSvc", "rpcss")
+        AllowedDependentServices = @()
+        ServiceStartName      = "LocalSystem"
+        ServiceType           = "Own Process"
+        DelayedAutoStartPresent = $false
+        DelayedAutoStartValue = "0"
+        RecoveryFailureActionsBase64 = "gFEBAAEAAAABAAAAAwAAABQAAAABAAAAMHUAAAEAAABg6gAAAQAAAJBfAQA="
+        ExecutableFileName    = "TouchpointAnalyticsClientService.exe"
+        ExecutablePathMarker  = "\System32\DriverStore\FileRepository\hpanalyticscomp.inf_"
+        ExecutablePathSuffix  = "\x64\TouchpointAnalyticsClientService.exe"
+        ExecutableCompany     = "HP Inc."
+        ExecutableProduct     = "HP Insights Analytics"
+        ExecutableSignatureStatus = "Valid"
+        ExecutableSignerSubjectPattern = "Microsoft Windows Hardware Compatibility Publisher"
         ExecutorId            = "DisableService"
         TargetState           = "Stopped"
         TargetStartupType     = "Disabled"
         MutatingCommands      = @("Stop-Service", "Set-Service")
         RollbackOperationType = "RestoreServiceConfiguration"
         RollbackTargetState   = "CapturedBeforeState"
+        RollbackMutatingCommands = @(
+            "Set-Service",
+            "Start-Service",
+            "New-ItemProperty",
+            "Remove-ItemProperty"
+        )
     }
 }
 
@@ -204,6 +224,161 @@ function Test-ToolkitOptimizationLiteralTaskIdentity {
     return $true
 }
 
+function Test-ToolkitOptimizationLiteralServiceIdentity {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ServiceName
+    )
+
+    return (
+        -not [string]::IsNullOrWhiteSpace($ServiceName) -and
+        -not [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters(
+            $ServiceName
+        ) -and
+        $ServiceName -notmatch "[\\/\x00-\x1f]" -and
+        -not $ServiceName.Contains("..")
+    )
+}
+
+function ConvertFrom-ToolkitOptimizationStringArray {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$Json
+    )
+
+    if (
+        [string]::IsNullOrWhiteSpace($Json) -or
+        -not $Json.TrimStart().StartsWith("[") -or
+        -not $Json.TrimEnd().EndsWith("]")
+    ) {
+        return $null
+    }
+
+    try {
+        $values = @($Json | ConvertFrom-Json -ErrorAction Stop)
+    }
+    catch {
+        return $null
+    }
+
+    foreach ($value in $values) {
+        if (
+            $null -eq $value -or
+            [string]::IsNullOrWhiteSpace([string]$value) -or
+            [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters(
+                [string]$value
+            ) -or
+            [string]$value -match "[\\/\x00-\x1f]" -or
+            [string]$value -like "*..*"
+        ) {
+            return $null
+        }
+    }
+
+    return ,$values
+}
+
+function Test-ToolkitOptimizationRecoveryConfiguration {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$Json,
+        [string]$ExpectedFailureActionsBase64 = (
+            Get-ToolkitOptimizationServiceExecutorContract
+        ).RecoveryFailureActionsBase64
+    )
+
+    try {
+        $configuration = $Json | ConvertFrom-Json -ErrorAction Stop
+        $requiredProperties = @(
+            "FailureActionsPresent",
+            "FailureActionsBase64",
+            "FailureActionsOnNonCrashFailuresPresent",
+            "FailureActionsOnNonCrashFailures",
+            "FailureCommandPresent",
+            "FailureCommand",
+            "RebootMessagePresent",
+            "RebootMessage"
+        )
+        foreach ($propertyName in $requiredProperties) {
+            if ($null -eq $configuration.PSObject.Properties[$propertyName]) {
+                return $false
+            }
+        }
+
+        foreach ($booleanProperty in @(
+            "FailureActionsPresent",
+            "FailureActionsOnNonCrashFailuresPresent",
+            "FailureCommandPresent",
+            "RebootMessagePresent"
+        )) {
+            if ($configuration.$booleanProperty -isnot [bool]) {
+                return $false
+            }
+        }
+
+        if (
+            -not $configuration.FailureActionsPresent -or
+            [string]::IsNullOrWhiteSpace([string]$configuration.FailureActionsBase64) -or
+            [string]$configuration.FailureActionsBase64 -cne
+                $ExpectedFailureActionsBase64 -or
+            $configuration.FailureActionsOnNonCrashFailuresPresent -or
+            -not [string]::IsNullOrEmpty(
+                [string]$configuration.FailureActionsOnNonCrashFailures
+            ) -or
+            $configuration.FailureCommandPresent -or
+            -not [string]::IsNullOrEmpty([string]$configuration.FailureCommand) -or
+            $configuration.RebootMessagePresent -or
+            -not [string]::IsNullOrEmpty([string]$configuration.RebootMessage)
+        ) {
+            return $false
+        }
+
+        try {
+            $failureActions = [Convert]::FromBase64String(
+                [string]$configuration.FailureActionsBase64
+            )
+        }
+        catch {
+            return $false
+        }
+        if ($failureActions.Count -eq 0 -or $failureActions.Count -gt 4096) {
+            return $false
+        }
+
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+function Test-ToolkitOptimizationDelayedAutoStartConfiguration {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$Json,
+        [bool]$ExpectedPresent = (
+            Get-ToolkitOptimizationServiceExecutorContract
+        ).DelayedAutoStartPresent,
+        [string]$ExpectedValue = (
+            Get-ToolkitOptimizationServiceExecutorContract
+        ).DelayedAutoStartValue
+    )
+
+    try {
+        $configuration = $Json | ConvertFrom-Json -ErrorAction Stop
+        return (
+            $null -ne $configuration.PSObject.Properties["Present"] -and
+            $null -ne $configuration.PSObject.Properties["Value"] -and
+            $configuration.Present -is [bool] -and
+            [bool]$configuration.Present -eq $ExpectedPresent -and
+            [string]$configuration.Value -eq $ExpectedValue
+        )
+    }
+    catch {
+        return $false
+    }
+}
+
 function Get-ToolkitOptimizationExecutionPolicyMatch {
     [CmdletBinding()]
     param(
@@ -274,6 +449,29 @@ function Get-ToolkitOptimizationExecutionPolicyMatch {
         -Finding $PlanEntry `
         -Name "ServiceDisplayName"
     $startupType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "StartupType"
+    $dependencies = ConvertFrom-ToolkitOptimizationStringArray `
+        -Json (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Dependencies")
+    $dependentServices = ConvertFrom-ToolkitOptimizationStringArray `
+        -Json (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "DependentServices")
+    $serviceStartName = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ServiceStartName"
+    $serviceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceType"
+    $executablePath = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ExecutablePath"
+    $executableCompany = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ExecutableCompany"
+    $executableProduct = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ExecutableProduct"
+    $executableSignatureStatus = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ExecutableSignatureStatus"
+    $executableSignerSubject = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ExecutableSignerSubject"
 
     foreach ($policy in @($Rules.executionPolicies)) {
         $policyContractValid = (
@@ -287,7 +485,22 @@ function Get-ToolkitOptimizationExecutionPolicyMatch {
             (Test-ToolkitOptimizationTextEquals $policy.rollbackOperationType $serviceContract.RollbackOperationType) -and
             (Test-ToolkitOptimizationTextEquals $policy.rollbackTargetState $serviceContract.RollbackTargetState) -and
             (Test-ToolkitOptimizationTextEquals $policy.serviceName $serviceContract.ServiceName) -and
-            (Test-ToolkitOptimizationTextEquals $policy.serviceDisplayName $serviceContract.ServiceDisplayName)
+            (Test-ToolkitOptimizationTextEquals $policy.serviceDisplayName $serviceContract.ServiceDisplayName) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $policy.requiredDependencies $serviceContract.RequiredDependencies) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $policy.allowedDependentServices $serviceContract.AllowedDependentServices) -and
+            (Test-ToolkitOptimizationTextEquals $policy.serviceStartName $serviceContract.ServiceStartName) -and
+            (Test-ToolkitOptimizationTextEquals $policy.serviceType $serviceContract.ServiceType) -and
+            [bool]$policy.delayedAutoStartPresent -eq $serviceContract.DelayedAutoStartPresent -and
+            (Test-ToolkitOptimizationTextEquals $policy.delayedAutoStartValue $serviceContract.DelayedAutoStartValue) -and
+            (Test-ToolkitOptimizationTextEquals $policy.recoveryFailureActionsBase64 $serviceContract.RecoveryFailureActionsBase64) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executableFileName $serviceContract.ExecutableFileName) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executablePathMarker $serviceContract.ExecutablePathMarker) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executablePathSuffix $serviceContract.ExecutablePathSuffix) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executableCompany $serviceContract.ExecutableCompany) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executableProduct $serviceContract.ExecutableProduct) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executableSignatureStatus $serviceContract.ExecutableSignatureStatus) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executableSignerSubjectPattern $serviceContract.ExecutableSignerSubjectPattern) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $policy.rollbackMutatingCommands $serviceContract.RollbackMutatingCommands)
         )
         $planMatchesPolicy = (
             (Test-ToolkitOptimizationTextEquals $actionId $serviceContract.ActionId) -and
@@ -303,7 +516,29 @@ function Get-ToolkitOptimizationExecutionPolicyMatch {
             (Test-ToolkitOptimizationCollectionContains $serviceContract.AllowedStartupTypes $startupType) -and
             (Test-ToolkitOptimizationCollectionContains $policy.allowedStartupTypes $startupType) -and
             (Test-ToolkitOptimizationTextEquals $serviceName $serviceContract.ServiceName) -and
-            (Test-ToolkitOptimizationTextEquals $serviceDisplayName $serviceContract.ServiceDisplayName)
+            (Test-ToolkitOptimizationTextEquals $serviceDisplayName $serviceContract.ServiceDisplayName) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $dependencies $serviceContract.RequiredDependencies) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $dependentServices $serviceContract.AllowedDependentServices) -and
+            (Test-ToolkitOptimizationTextEquals $serviceStartName $serviceContract.ServiceStartName) -and
+            (Test-ToolkitOptimizationTextEquals $serviceType $serviceContract.ServiceType) -and
+            (Test-ToolkitOptimizationTextEquals $executableCompany $serviceContract.ExecutableCompany) -and
+            (Test-ToolkitOptimizationTextEquals $executableProduct $serviceContract.ExecutableProduct) -and
+            (Test-ToolkitOptimizationTextEquals $executableSignatureStatus $serviceContract.ExecutableSignatureStatus) -and
+            $executablePath.EndsWith(
+                $serviceContract.ExecutablePathSuffix,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -and
+            $executablePath.IndexOf(
+                $serviceContract.ExecutablePathMarker,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -ge 0 -and
+            (Test-ToolkitOptimizationTextEquals `
+                ([System.IO.Path]::GetFileName($executablePath)) `
+                $serviceContract.ExecutableFileName) -and
+            $executableSignerSubject.IndexOf(
+                $serviceContract.ExecutableSignerSubjectPattern,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -ge 0
         )
 
         if ($policyContractValid -and $planMatchesPolicy) {
@@ -318,6 +553,20 @@ function Get-ToolkitOptimizationExecutionPolicyMatch {
                 RollbackTargetState   = $serviceContract.RollbackTargetState
                 ServiceName           = $serviceContract.ServiceName
                 ServiceDisplayName    = $serviceContract.ServiceDisplayName
+                RequiredDependencies  = $serviceContract.RequiredDependencies
+                AllowedDependentServices = $serviceContract.AllowedDependentServices
+                ServiceStartName      = $serviceContract.ServiceStartName
+                ServiceType           = $serviceContract.ServiceType
+                DelayedAutoStartPresent = $serviceContract.DelayedAutoStartPresent
+                DelayedAutoStartValue = $serviceContract.DelayedAutoStartValue
+                RecoveryFailureActionsBase64 = $serviceContract.RecoveryFailureActionsBase64
+                ExecutableFileName    = $serviceContract.ExecutableFileName
+                ExecutablePathMarker  = $serviceContract.ExecutablePathMarker
+                ExecutablePathSuffix  = $serviceContract.ExecutablePathSuffix
+                ExecutableCompany     = $serviceContract.ExecutableCompany
+                ExecutableProduct     = $serviceContract.ExecutableProduct
+                ExecutableSignatureStatus = $serviceContract.ExecutableSignatureStatus
+                ExecutableSignerSubjectPattern = $serviceContract.ExecutableSignerSubjectPattern
             }
         }
     }
@@ -414,8 +663,43 @@ function Test-ToolkitOptimizationExecutorScope {
             $recoveryConfiguration = Get-ToolkitFindingPropertyValue `
                 -Finding $PlanEntry `
                 -Name "RecoveryConfiguration"
+            $delayedAutoStartConfiguration = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "DelayedAutoStartConfiguration"
+            $servicePath = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ServicePath"
+            $serviceStartName = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ServiceStartName"
+            $serviceType = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ServiceType"
+            $dependentServicesJson = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "DependentServices"
+            $dependenciesValues = ConvertFrom-ToolkitOptimizationStringArray `
+                -Json $dependencies
+            $dependentServicesValues = ConvertFrom-ToolkitOptimizationStringArray `
+                -Json $dependentServicesJson
+            $executablePath = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ExecutablePath"
+            $executableCompany = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ExecutableCompany"
+            $executableProduct = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ExecutableProduct"
+            $executableSignatureStatus = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ExecutableSignatureStatus"
+            $executableSignerSubject = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ExecutableSignerSubject"
 
             if (
+                -not (Test-ToolkitOptimizationLiteralServiceIdentity $serviceName) -or
                 -not (Test-ToolkitOptimizationTextEquals $serviceName $ExecutionPolicy.ServiceName) -or
                 -not (Test-ToolkitOptimizationTextEquals $serviceDisplayName $ExecutionPolicy.ServiceDisplayName) -or
                 -not (Test-ToolkitOptimizationTextEquals $sourceName $ExecutionPolicy.ServiceDisplayName) -or
@@ -423,8 +707,37 @@ function Test-ToolkitOptimizationExecutorScope {
                 -not (Test-ToolkitOptimizationTextEquals $category "Telemetry") -or
                 -not (Test-ToolkitOptimizationTextEquals $recommendation "Review / likely disable") -or
                 -not (Test-ToolkitOptimizationTextEquals $sourceFinding $expectedFinding) -or
-                [string]::IsNullOrWhiteSpace($dependencies) -or
-                [string]::IsNullOrWhiteSpace($recoveryConfiguration)
+                -not (Test-ToolkitOptimizationCollectionSetEquals $dependenciesValues $ExecutionPolicy.RequiredDependencies) -or
+                -not (Test-ToolkitOptimizationCollectionSetEquals $dependentServicesValues $ExecutionPolicy.AllowedDependentServices) -or
+                -not (Test-ToolkitOptimizationTextEquals $serviceStartName $ExecutionPolicy.ServiceStartName) -or
+                -not (Test-ToolkitOptimizationTextEquals $serviceType $ExecutionPolicy.ServiceType) -or
+                -not (Test-ToolkitOptimizationDelayedAutoStartConfiguration `
+                    -Json $delayedAutoStartConfiguration `
+                    -ExpectedPresent $ExecutionPolicy.DelayedAutoStartPresent `
+                    -ExpectedValue $ExecutionPolicy.DelayedAutoStartValue) -or
+                -not (Test-ToolkitOptimizationRecoveryConfiguration `
+                    -Json $recoveryConfiguration `
+                    -ExpectedFailureActionsBase64 $ExecutionPolicy.RecoveryFailureActionsBase64) -or
+                -not (Test-ToolkitOptimizationTextEquals $executableCompany $ExecutionPolicy.ExecutableCompany) -or
+                -not (Test-ToolkitOptimizationTextEquals $executableProduct $ExecutionPolicy.ExecutableProduct) -or
+                -not (Test-ToolkitOptimizationTextEquals $executableSignatureStatus $ExecutionPolicy.ExecutableSignatureStatus) -or
+                [string]::IsNullOrWhiteSpace($servicePath) -or
+                -not (Test-ToolkitOptimizationTextEquals $servicePath $executablePath) -or
+                -not $executablePath.EndsWith(
+                    $ExecutionPolicy.ExecutablePathSuffix,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                ) -or
+                $executablePath.IndexOf(
+                    $ExecutionPolicy.ExecutablePathMarker,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                ) -lt 0 -or
+                -not (Test-ToolkitOptimizationTextEquals `
+                    ([System.IO.Path]::GetFileName($executablePath)) `
+                    $ExecutionPolicy.ExecutableFileName) -or
+                $executableSignerSubject.IndexOf(
+                    $ExecutionPolicy.ExecutableSignerSubjectPattern,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                ) -lt 0
             ) {
                 return [PSCustomObject]@{
                     Allowed      = $false
@@ -530,7 +843,7 @@ function Get-ToolkitOptimizationExecutorEligibility {
         Allowed            = $true
         DecisionCode       = "ExecutionPolicyAllowed"
         SafetyPolicyResult = "Allowed"
-        Reason             = "The action matches the fixed executor policy and dedicated HP scheduled-task scope."
+            Reason             = "The action matches the fixed executor policy and exact dedicated HP target scope."
         Remediation        = ""
         ExecutionPolicy    = $executionPolicy
     }
@@ -623,7 +936,17 @@ function Get-ToolkitOptimizationSourceIdentityParts {
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceName"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceDisplayName"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "StartupType"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServicePath"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceStartName"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceType"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DelayedAutoStartConfiguration"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Dependencies"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DependentServices"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutablePath"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableCompany"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableProduct"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableSignatureStatus"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableSignerSubject"
         Get-ToolkitFindingPropertyValue -Finding $Finding -Name "RecoveryConfiguration"
     )
     if (@($serviceValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
@@ -820,7 +1143,17 @@ function ConvertTo-ToolkitOptimizationPlanEntry {
         -ServiceName (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceName") `
         -ServiceDisplayName (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceDisplayName") `
         -StartupType (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "StartupType") `
+        -ServicePath (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServicePath") `
+        -ServiceStartName (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceStartName") `
+        -ServiceType (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceType") `
+        -DelayedAutoStartConfiguration (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DelayedAutoStartConfiguration") `
         -Dependencies (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Dependencies") `
+        -DependentServices (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "DependentServices") `
+        -ExecutablePath (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutablePath") `
+        -ExecutableCompany (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableCompany") `
+        -ExecutableProduct (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableProduct") `
+        -ExecutableSignatureStatus (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableSignatureStatus") `
+        -ExecutableSignerSubject (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ExecutableSignerSubject") `
         -RecoveryConfiguration (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "RecoveryConfiguration") `
         -RequiresConfirmation $true `
         -ConfirmationRequirement ([string]$action.confirmationRequirement) `
@@ -1093,7 +1426,17 @@ function ConvertTo-ToolkitRollbackManifestEntry {
         ServiceName    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceName"
         ServiceDisplayName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceDisplayName"
         StartupType    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "StartupType"
+        ServicePath    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServicePath"
+        ServiceStartName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceStartName"
+        ServiceType    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceType"
+        DelayedAutoStartConfiguration = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "DelayedAutoStartConfiguration"
         Dependencies   = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Dependencies"
+        DependentServices = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "DependentServices"
+        ExecutablePath = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ExecutablePath"
+        ExecutableCompany = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ExecutableCompany"
+        ExecutableProduct = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ExecutableProduct"
+        ExecutableSignatureStatus = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ExecutableSignatureStatus"
+        ExecutableSignerSubject = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ExecutableSignerSubject"
         RecoveryConfiguration = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "RecoveryConfiguration"
     }
     $requiredBeforeStateFields = @($operationProfile.requiredBeforeStateFields)

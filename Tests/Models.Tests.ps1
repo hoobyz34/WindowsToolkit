@@ -118,13 +118,26 @@ Describe "Finding Model" {
             -ServiceName "HpTouchpointAnalyticsService" `
             -ServiceDisplayName "HP Insights Analytics" `
             -StartupType "Automatic" `
+            -ServicePath "C:\Windows\HP\TouchpointAnalyticsClientService.exe" `
+            -ServiceStartName "LocalSystem" `
+            -ServiceType "Own Process" `
+            -DelayedAutoStartConfiguration '{"Present":false,"Value":"0"}' `
             -Dependencies '["ProfSvc","rpcss"]' `
+            -DependentServices '[]' `
+            -ExecutablePath "C:\Windows\HP\TouchpointAnalyticsClientService.exe" `
+            -ExecutableCompany "HP Inc." `
+            -ExecutableProduct "HP Insights Analytics" `
+            -ExecutableSignatureStatus "Valid" `
+            -ExecutableSignerSubject "CN=Microsoft Windows Hardware Compatibility Publisher" `
             -RecoveryConfiguration '{"FailureActionsPresent":true}'
 
         $finding.ServiceName | Should -Be "HpTouchpointAnalyticsService"
         $finding.ServiceDisplayName | Should -Be "HP Insights Analytics"
         $finding.StartupType | Should -Be "Automatic"
         $finding.Dependencies | Should -Be '["ProfSvc","rpcss"]'
+        $finding.DependentServices | Should -Be '[]'
+        $finding.ServiceStartName | Should -Be "LocalSystem"
+        $finding.ExecutableCompany | Should -Be "HP Inc."
         $finding.RecoveryConfiguration |
             Should -Be '{"FailureActionsPresent":true}'
     }
