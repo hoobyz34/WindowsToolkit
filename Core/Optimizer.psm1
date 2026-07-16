@@ -1,6 +1,372 @@
 Import-Module (Join-Path $PSScriptRoot "Models.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "Utility.psm1") -Force
 
+function Get-ToolkitOptimizationExecutorContract {
+    [CmdletBinding()]
+    param()
+
+    return [PSCustomObject]@{
+        PolicyId                   = "disable-hp-scheduled-task"
+        ActionId                   = "review-likely-disable"
+        OperationType              = "ScheduledTaskStateChange"
+        SourceTypes                = @("Scheduled Task", "ScheduledTask")
+        Vendor                     = "HP"
+        ReportFile                 = "ScheduledTasks_Report.csv"
+        AllowedCurrentStates       = @("Ready", "Disabled")
+        ExecutorId                 = "DisableScheduledTask"
+        TargetState                = "Disabled"
+        MutatingCommand            = "Disable-ScheduledTask"
+        RollbackOperationType      = "EnableScheduledTask"
+        RollbackTargetState        = "Enabled"
+        TaskPathPrefix             = "\HP\"
+        TaskNamePatterns           = @(
+            "HP Insights",
+            "HP Analytics",
+            "HP Touchpoint",
+            "Telemetry"
+        )
+        TaskAuthorPatterns         = @(
+            "HP",
+            "Hewlett-Packard"
+        )
+        PermanentProtectedPatterns = @(
+            "Microsoft Defender",
+            "Windows Update",
+            "Microsoft Store",
+            "Windows Hello",
+            "OneDrive",
+            "Driver Easy"
+        )
+    }
+}
+
+function Test-ToolkitOptimizationTextEquals {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object]$Left,
+        [AllowNull()][object]$Right
+    )
+
+    return [string]::Equals(
+        [string]$Left,
+        [string]$Right,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )
+}
+
+function Test-ToolkitOptimizationCollectionContains {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object[]]$Values,
+        [AllowNull()][object]$Expected
+    )
+
+    return @(
+        @($Values) |
+            Where-Object {
+                Test-ToolkitOptimizationTextEquals -Left $_ -Right $Expected
+            }
+    ).Count -gt 0
+}
+
+function Get-ToolkitOptimizationConfiguredExecutionPatterns {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object[]]$ConfiguredPatterns,
+        [Parameter(Mandatory)][string[]]$MaximumPatterns
+    )
+
+    return @(
+        foreach ($maximumPattern in $MaximumPatterns) {
+            if (
+                Test-ToolkitOptimizationCollectionContains `
+                    -Values $ConfiguredPatterns `
+                    -Expected $maximumPattern
+            ) {
+                $maximumPattern
+            }
+        }
+    )
+}
+
+function Test-ToolkitPermanentOptimizationProtection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$PlanEntry
+    )
+
+    $contract = Get-ToolkitOptimizationExecutorContract
+    $searchText = @(
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
+    ) -join " "
+    $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
+    $risk = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Risk"
+    $source = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+
+    if (
+        (Test-ToolkitOptimizationTextEquals $category "Required") -or
+        (Test-ToolkitOptimizationTextEquals $risk "Critical") -or
+        $source.StartsWith(
+            "\Microsoft\",
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        return $true
+    }
+
+    foreach ($protectedPattern in $contract.PermanentProtectedPatterns) {
+        if (
+            $searchText.IndexOf(
+                $protectedPattern,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -ge 0
+        ) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-ToolkitOptimizationLiteralTaskIdentity {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$TaskName,
+        [Parameter(Mandatory)][string]$TaskPath
+    )
+
+    if (
+        [string]::IsNullOrWhiteSpace($TaskName) -or
+        [string]::IsNullOrWhiteSpace($TaskPath) -or
+        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($TaskName) -or
+        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($TaskPath) -or
+        $TaskName -match "[\\/\x00-\x1f]" -or
+        $TaskPath -match "[\x00-\x1f]" -or
+        $TaskPath.Contains("..") -or
+        -not $TaskPath.EndsWith("\", [System.StringComparison]::Ordinal)
+    ) {
+        return $false
+    }
+
+    return $true
+}
+
+function Get-ToolkitOptimizationExecutionPolicyMatch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$PlanEntry,
+        [Parameter(Mandatory)][string]$OperationType,
+        [Parameter(Mandatory)][object]$Rules
+    )
+
+    $contract = Get-ToolkitOptimizationExecutorContract
+    $actionId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId"
+    $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
+    $vendor = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Vendor"
+    $reportFile = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ReportFile"
+    $currentState = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "CurrentState"
+
+    foreach ($policy in @($Rules.executionPolicies)) {
+        $namePatterns = Get-ToolkitOptimizationConfiguredExecutionPatterns `
+            -ConfiguredPatterns @($policy.allowedTaskNamePatterns) `
+            -MaximumPatterns $contract.TaskNamePatterns
+        $authorPatterns = Get-ToolkitOptimizationConfiguredExecutionPatterns `
+            -ConfiguredPatterns @($policy.allowedTaskAuthorPatterns) `
+            -MaximumPatterns $contract.TaskAuthorPatterns
+        $policyContractValid = (
+            (Test-ToolkitOptimizationTextEquals $policy.id $contract.PolicyId) -and
+            (Test-ToolkitOptimizationTextEquals $policy.actionId $contract.ActionId) -and
+            (Test-ToolkitOptimizationTextEquals $policy.operationType $contract.OperationType) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executorId $contract.ExecutorId) -and
+            (Test-ToolkitOptimizationTextEquals $policy.targetState $contract.TargetState) -and
+            (Test-ToolkitOptimizationTextEquals $policy.mutatingCommand $contract.MutatingCommand) -and
+            (Test-ToolkitOptimizationTextEquals $policy.rollbackOperationType $contract.RollbackOperationType) -and
+            (Test-ToolkitOptimizationTextEquals $policy.rollbackTargetState $contract.RollbackTargetState) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedTaskPathPrefixes $contract.TaskPathPrefix) -and
+            $namePatterns.Count -gt 0 -and
+            $authorPatterns.Count -gt 0
+        )
+        $planMatchesPolicy = (
+            (Test-ToolkitOptimizationTextEquals $actionId $contract.ActionId) -and
+            (Test-ToolkitOptimizationTextEquals $OperationType $contract.OperationType) -and
+            (Test-ToolkitOptimizationCollectionContains $contract.SourceTypes $sourceType) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.sourceTypes $sourceType) -and
+            (Test-ToolkitOptimizationTextEquals $vendor $contract.Vendor) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedVendors $vendor) -and
+            (Test-ToolkitOptimizationTextEquals $reportFile $contract.ReportFile) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedReportFiles $reportFile) -and
+            (Test-ToolkitOptimizationCollectionContains $contract.AllowedCurrentStates $currentState) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedCurrentStates $currentState)
+        )
+
+        if ($policyContractValid -and $planMatchesPolicy) {
+            return [PSCustomObject]@{
+                Id                    = $contract.PolicyId
+                ActionId              = $contract.ActionId
+                OperationType         = $contract.OperationType
+                ExecutorId            = $contract.ExecutorId
+                TargetState           = $contract.TargetState
+                RollbackOperationType = $contract.RollbackOperationType
+                RollbackTargetState   = $contract.RollbackTargetState
+                TaskPathPrefix        = $contract.TaskPathPrefix
+                TaskNamePatterns      = $namePatterns
+                TaskAuthorPatterns    = $authorPatterns
+            }
+        }
+    }
+
+    return $null
+}
+
+function Test-ToolkitOptimizationExecutorScope {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$PlanEntry,
+        [Parameter(Mandatory)][object]$ExecutionPolicy
+    )
+
+    $taskName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+    $taskPath = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+    $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
+    $sourceFinding = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
+    $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
+    $recommendation = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Recommendation"
+    $expectedFinding = "${sourceType}: $taskName"
+    $nameAllowed = @(
+        $ExecutionPolicy.TaskNamePatterns |
+            Where-Object {
+                $taskName.IndexOf(
+                    [string]$_,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                ) -ge 0
+            }
+    ).Count -gt 0
+
+    if (-not (Test-ToolkitOptimizationLiteralTaskIdentity -TaskName $taskName -TaskPath $taskPath)) {
+        return [PSCustomObject]@{
+            Allowed      = $false
+            DecisionCode = "UnsafeTargetIdentity"
+            Reason       = "The scheduled-task name or path is not a safe literal identity."
+            Remediation  = "Regenerate the plan from a scheduled task with a literal name and path."
+        }
+    }
+
+    if (
+        -not $taskPath.StartsWith(
+            [string]$ExecutionPolicy.TaskPathPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        return [PSCustomObject]@{
+            Allowed      = $false
+            DecisionCode = "OutsideDedicatedTaskScope"
+            Reason       = "The scheduled task is outside the dedicated HP task namespace."
+            Remediation  = "Only HP telemetry tasks under the dedicated \HP\ task path are executable."
+        }
+    }
+
+    if (
+        -not $nameAllowed -or
+        -not (Test-ToolkitOptimizationTextEquals $category "Telemetry") -or
+        -not (Test-ToolkitOptimizationTextEquals $recommendation "Review / likely disable") -or
+        -not (Test-ToolkitOptimizationTextEquals $sourceFinding $expectedFinding)
+    ) {
+        return [PSCustomObject]@{
+            Allowed      = $false
+            DecisionCode = "TargetScopeMismatch"
+            Reason       = "The plan does not identify an allowlisted HP telemetry scheduled task."
+            Remediation  = "Regenerate the plan from the Scheduled Task analyzer and review the source metadata."
+        }
+    }
+
+    return [PSCustomObject]@{
+        Allowed      = $true
+        DecisionCode = "TargetScopeAllowed"
+        Reason       = "The target is within the dedicated HP telemetry scheduled-task scope."
+        Remediation  = ""
+    }
+}
+
+function Get-ToolkitOptimizationExecutorEligibility {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$PlanEntry,
+        [Parameter(Mandatory)][string]$OperationType,
+        [Parameter(Mandatory)][object]$Rules
+    )
+
+    if (
+        (Test-ToolkitPermanentOptimizationProtection -PlanEntry $PlanEntry) -or
+        (Test-ToolkitProtectedFinding -Finding $PlanEntry -Rules $Rules)
+    ) {
+        return [PSCustomObject]@{
+            Allowed            = $false
+            DecisionCode       = "ProtectedComponent"
+            SafetyPolicyResult = "Blocked - Protected"
+            Reason             = "The plan entry matches a permanent protected-component policy."
+            Remediation        = "Retain the protected component; executor policy cannot override this block."
+            ExecutionPolicy    = $null
+        }
+    }
+
+    $executionPolicy = Get-ToolkitOptimizationExecutionPolicyMatch `
+        -PlanEntry $PlanEntry `
+        -OperationType $OperationType `
+        -Rules $Rules
+
+    if ($null -eq $executionPolicy) {
+        return [PSCustomObject]@{
+            Allowed            = $false
+            DecisionCode       = "ExecutionPolicyDenied"
+            SafetyPolicyResult = "Blocked - Executor Policy"
+            Reason             = "No executor policy allowlists this action, source type, operation type, vendor, report source, and current state."
+            Remediation        = "Retain the item or regenerate it from the dedicated HP Scheduled Task analyzer path."
+            ExecutionPolicy    = $null
+        }
+    }
+
+    if (
+        Test-ToolkitOptimizationTextEquals `
+            (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "CurrentState") `
+            $executionPolicy.TargetState
+    ) {
+        return [PSCustomObject]@{
+            Allowed            = $false
+            DecisionCode       = "AlreadyAtTargetState"
+            SafetyPolicyResult = "Blocked - Target State"
+            Reason             = "The scheduled task is already in the executor target state."
+            Remediation        = "No action is required; regenerate reports if the plan still proposes this change."
+            ExecutionPolicy    = $executionPolicy
+        }
+    }
+
+    $scope = Test-ToolkitOptimizationExecutorScope `
+        -PlanEntry $PlanEntry `
+        -ExecutionPolicy $executionPolicy
+    if (-not $scope.Allowed) {
+        return [PSCustomObject]@{
+            Allowed            = $false
+            DecisionCode       = $scope.DecisionCode
+            SafetyPolicyResult = "Blocked - Executor Scope"
+            Reason             = $scope.Reason
+            Remediation        = $scope.Remediation
+            ExecutionPolicy    = $executionPolicy
+        }
+    }
+
+    return [PSCustomObject]@{
+        Allowed            = $true
+        DecisionCode       = "ExecutionPolicyAllowed"
+        SafetyPolicyResult = "Allowed"
+        Reason             = "The action matches the fixed executor policy and dedicated HP scheduled-task scope."
+        Remediation        = ""
+        ExecutionPolicy    = $executionPolicy
+    }
+}
+
 function Get-ToolkitOptimizationActionRules {
     [CmdletBinding()]
     param([string]$Path)
@@ -275,8 +641,24 @@ function ConvertTo-ToolkitOptimizationPreflightResult {
     $currentState = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "CurrentState"
     $actionPolicy = Get-ToolkitOptimizationActionPolicy -ActionId $actionId -Rules $Rules
     $operationProfile = Get-ToolkitOptimizationOperationProfile -SourceType $sourceType -Rules $Rules
-    $isProtected = Test-ToolkitProtectedFinding -Finding $PlanEntry -Rules $Rules
+    $isProtected = (
+        (Test-ToolkitProtectedFinding -Finding $PlanEntry -Rules $Rules) -or
+        (Test-ToolkitPermanentOptimizationProtection -PlanEntry $PlanEntry)
+    )
     $isCandidate = [bool]$actionPolicy.preflight.isCandidate
+    $executorEligibility = if ($isCandidate) {
+        Get-ToolkitOptimizationExecutorEligibility `
+            -PlanEntry $PlanEntry `
+            -OperationType ([string]$operationProfile.operationType) `
+            -Rules $Rules
+    }
+    else {
+        $null
+    }
+    $executorAllowed = (
+        -not $isCandidate -or
+        ($null -ne $executorEligibility -and [bool]$executorEligibility.Allowed)
+    )
     $requiresCurrentState = [bool]$actionPolicy.preflight.requiresCurrentState
     $administratorRequired = (
         $isCandidate -and
@@ -330,7 +712,13 @@ function ConvertTo-ToolkitOptimizationPreflightResult {
         $remediation.Add("Keep the entry for review; no apply operation is defined.")
         "No Change Defined"
     }
+    elseif (-not $executorAllowed) {
+        $reasons.Add([string]$executorEligibility.Reason)
+        $remediation.Add([string]$executorEligibility.Remediation)
+        [string]$executorEligibility.SafetyPolicyResult
+    }
     else {
+        $reasons.Add([string]$executorEligibility.Reason)
         "Allowed"
     }
 
@@ -361,6 +749,7 @@ function ConvertTo-ToolkitOptimizationPreflightResult {
     $isBlocked = (
         $isProtected -or
         -not $isCandidate -or
+        -not $executorAllowed -or
         ($requiresCurrentState -and [string]::IsNullOrWhiteSpace($currentState)) -or
         -not $reversible -or
         ($isCandidate -and -not $confirmationRequired) -or

@@ -76,4 +76,32 @@ Describe "Finding Model" {
         $finding.State | Should -Be "Installed"
     }
 
+    It "uses an explicit fallback for a blank source" {
+        $finding = New-ToolkitFinding `
+            -Name "HP Device" `
+            -Type "HP Driver" `
+            -Vendor "HP" `
+            -Category "Unknown" `
+            -Recommendation "Review" `
+            -Risk "Unknown" `
+            -Reason "Source metadata was not reported." `
+            -Source ""
+
+        $finding.Source | Should -Be "Source unavailable"
+    }
+
+    It "preserves meaningful source values" {
+        $finding = New-ToolkitFinding `
+            -Name "HP Device" `
+            -Type "HP Driver" `
+            -Vendor "HP" `
+            -Category "Unknown" `
+            -Recommendation "Review" `
+            -Risk "Unknown" `
+            -Reason "Source metadata was reported." `
+            -Source "hpdevice.inf"
+
+        $finding.Source | Should -Be "hpdevice.inf"
+    }
+
 }

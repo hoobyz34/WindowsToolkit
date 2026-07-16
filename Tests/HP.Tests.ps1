@@ -127,6 +127,29 @@ Describe "HP Analyzer" {
         }
     }
 
+    It "reports HP findings when discovered source metadata is blank" {
+        Mock Get-ToolkitDrivers {
+            [PSCustomObject]@{
+                DeviceName = "HP Source-Less Device"
+                Manufacturer = "HP"
+                DriverProviderName = "HP"
+                InfName = ""
+                DriverVersion = "1.2.3"
+            }
+        }
+
+        {
+            & "$Root\Modules\HP.ps1"
+        } | Should -Not -Throw
+
+        $driver = $Global:HPAnalyzerReportedFindings |
+            Where-Object Name -eq "HP Source-Less Device"
+
+        Should -Invoke Save-CsvReport -Times 1 -Exactly
+        $driver | Should -Not -BeNullOrEmpty
+        $driver.Source | Should -Be "Source unavailable"
+    }
+
     It "uses a valid HP JSON rule file" {
         Test-Path "$Root\Data\HP.json" | Should -BeTrue
 

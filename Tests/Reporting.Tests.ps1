@@ -69,6 +69,23 @@ Describe "Reporting" {
         }
     }
 
+    It "reports the standardized source fallback" {
+        $findingWithoutSource = New-ToolkitFinding `
+            -Name "HP Device" `
+            -Type "HP Driver" `
+            -Vendor "HP" `
+            -Category "Unknown" `
+            -Recommendation "Review" `
+            -Risk "Unknown" `
+            -Reason "Source metadata was not reported." `
+            -Source ""
+        $path = Save-CsvReport `
+            -Name "MissingSource" `
+            -Data @($findingWithoutSource)
+
+        (Import-Csv $path)[0].Source | Should -Be "Source unavailable"
+    }
+
     It "creates a default repository report path without a session" {
         $Global:ToolkitRunPath = $null
 

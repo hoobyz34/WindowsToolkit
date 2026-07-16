@@ -1,40 +1,6 @@
 Import-Module (Join-Path $PSScriptRoot "Models.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "Optimizer.psm1") -Force
 
-$script:ExecutorContract = [PSCustomObject]@{
-    PolicyId                  = "disable-hp-scheduled-task"
-    ActionId                  = "review-likely-disable"
-    OperationType             = "ScheduledTaskStateChange"
-    SourceTypes               = @("Scheduled Task", "ScheduledTask")
-    Vendor                    = "HP"
-    ReportFile                = "ScheduledTasks_Report.csv"
-    AllowedCurrentStates      = @("Ready", "Disabled")
-    ExecutorId                = "DisableScheduledTask"
-    TargetState               = "Disabled"
-    MutatingCommand           = "Disable-ScheduledTask"
-    RollbackOperationType     = "EnableScheduledTask"
-    RollbackTargetState       = "Enabled"
-    TaskPathPrefix            = "\HP\"
-    TaskNamePatterns          = @(
-        "HP Insights",
-        "HP Analytics",
-        "HP Touchpoint",
-        "Telemetry"
-    )
-    TaskAuthorPatterns        = @(
-        "HP",
-        "Hewlett-Packard"
-    )
-    PermanentProtectedPatterns = @(
-        "Microsoft Defender",
-        "Windows Update",
-        "Microsoft Store",
-        "Windows Hello",
-        "OneDrive",
-        "Driver Easy"
-    )
-}
-
 function ConvertTo-ToolkitExecutionBoolean {
     [CmdletBinding()]
     param(
@@ -68,41 +34,6 @@ function Test-ToolkitExecutionStringEquals {
     )
 }
 
-function Test-ToolkitExecutionCollectionContains {
-    [CmdletBinding()]
-    param(
-        [AllowNull()][object[]]$Values,
-        [AllowNull()][object]$Expected
-    )
-
-    return @(
-        @($Values) |
-            Where-Object {
-                Test-ToolkitExecutionStringEquals -Left $_ -Right $Expected
-            }
-    ).Count -gt 0
-}
-
-function Get-ToolkitConfiguredExecutionPatterns {
-    [CmdletBinding()]
-    param(
-        [AllowNull()][object[]]$ConfiguredPatterns,
-        [Parameter(Mandatory)][string[]]$MaximumPatterns
-    )
-
-    return @(
-        foreach ($maximumPattern in $MaximumPatterns) {
-            if (
-                Test-ToolkitExecutionCollectionContains `
-                    -Values $ConfiguredPatterns `
-                    -Expected $maximumPattern
-            ) {
-                $maximumPattern
-            }
-        }
-    )
-}
-
 function Get-ToolkitOptimizationExecutionPolicy {
     [CmdletBinding()]
     param(
@@ -111,63 +42,16 @@ function Get-ToolkitOptimizationExecutionPolicy {
         [Parameter(Mandatory)][object]$Rules
     )
 
-    $contract = $script:ExecutorContract
-    $actionId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId"
-    $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
-    $vendor = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Vendor"
-    $reportFile = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ReportFile"
-    $currentState = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "CurrentState"
     $operationType = Get-ToolkitFindingPropertyValue `
         -Finding $RollbackManifest `
         -Name "OperationType"
+    $eligibility = Get-ToolkitOptimizationExecutorEligibility `
+        -PlanEntry $PlanEntry `
+        -OperationType $operationType `
+        -Rules $Rules
 
-    foreach ($policy in @($Rules.executionPolicies)) {
-        $namePatterns = Get-ToolkitConfiguredExecutionPatterns `
-            -ConfiguredPatterns @($policy.allowedTaskNamePatterns) `
-            -MaximumPatterns $contract.TaskNamePatterns
-        $authorPatterns = Get-ToolkitConfiguredExecutionPatterns `
-            -ConfiguredPatterns @($policy.allowedTaskAuthorPatterns) `
-            -MaximumPatterns $contract.TaskAuthorPatterns
-        $policyContractValid = (
-            (Test-ToolkitExecutionStringEquals $policy.id $contract.PolicyId) -and
-            (Test-ToolkitExecutionStringEquals $policy.actionId $contract.ActionId) -and
-            (Test-ToolkitExecutionStringEquals $policy.operationType $contract.OperationType) -and
-            (Test-ToolkitExecutionStringEquals $policy.executorId $contract.ExecutorId) -and
-            (Test-ToolkitExecutionStringEquals $policy.targetState $contract.TargetState) -and
-            (Test-ToolkitExecutionStringEquals $policy.mutatingCommand $contract.MutatingCommand) -and
-            (Test-ToolkitExecutionStringEquals $policy.rollbackOperationType $contract.RollbackOperationType) -and
-            (Test-ToolkitExecutionStringEquals $policy.rollbackTargetState $contract.RollbackTargetState) -and
-            (Test-ToolkitExecutionCollectionContains $policy.allowedTaskPathPrefixes $contract.TaskPathPrefix) -and
-            $namePatterns.Count -gt 0 -and
-            $authorPatterns.Count -gt 0
-        )
-        $planMatchesPolicy = (
-            (Test-ToolkitExecutionStringEquals $actionId $contract.ActionId) -and
-            (Test-ToolkitExecutionStringEquals $operationType $contract.OperationType) -and
-            (Test-ToolkitExecutionCollectionContains $contract.SourceTypes $sourceType) -and
-            (Test-ToolkitExecutionCollectionContains $policy.sourceTypes $sourceType) -and
-            (Test-ToolkitExecutionStringEquals $vendor $contract.Vendor) -and
-            (Test-ToolkitExecutionCollectionContains $policy.allowedVendors $vendor) -and
-            (Test-ToolkitExecutionStringEquals $reportFile $contract.ReportFile) -and
-            (Test-ToolkitExecutionCollectionContains $policy.allowedReportFiles $reportFile) -and
-            (Test-ToolkitExecutionCollectionContains $contract.AllowedCurrentStates $currentState) -and
-            (Test-ToolkitExecutionCollectionContains $policy.allowedCurrentStates $currentState)
-        )
-
-        if ($policyContractValid -and $planMatchesPolicy) {
-            return [PSCustomObject]@{
-                Id                    = $contract.PolicyId
-                ActionId              = $contract.ActionId
-                OperationType         = $contract.OperationType
-                ExecutorId            = $contract.ExecutorId
-                TargetState           = $contract.TargetState
-                RollbackOperationType = $contract.RollbackOperationType
-                RollbackTargetState   = $contract.RollbackTargetState
-                TaskPathPrefix        = $contract.TaskPathPrefix
-                TaskNamePatterns      = $namePatterns
-                TaskAuthorPatterns    = $authorPatterns
-            }
-        }
+    if ($eligibility.Allowed) {
+        return $eligibility.ExecutionPolicy
     }
 
     return $null
@@ -179,39 +63,7 @@ function Test-ToolkitPermanentExecutorProtection {
         [Parameter(Mandatory)][object]$PlanEntry
     )
 
-    $searchText = @(
-        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
-        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
-        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
-        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
-    ) -join " "
-    $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
-    $risk = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Risk"
-    $source = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
-
-    if (
-        (Test-ToolkitExecutionStringEquals $category "Required") -or
-        (Test-ToolkitExecutionStringEquals $risk "Critical") -or
-        $source.StartsWith(
-            "\Microsoft\",
-            [System.StringComparison]::OrdinalIgnoreCase
-        )
-    ) {
-        return $true
-    }
-
-    foreach ($protectedPattern in $script:ExecutorContract.PermanentProtectedPatterns) {
-        if (
-            $searchText.IndexOf(
-                $protectedPattern,
-                [System.StringComparison]::OrdinalIgnoreCase
-            ) -ge 0
-        ) {
-            return $true
-        }
-    }
-
-    return $false
+    return Test-ToolkitPermanentOptimizationProtection -PlanEntry $PlanEntry
 }
 
 function Test-ToolkitExecutorLiteralIdentity {
@@ -221,20 +73,9 @@ function Test-ToolkitExecutorLiteralIdentity {
         [Parameter(Mandatory)][string]$TaskPath
     )
 
-    if (
-        [string]::IsNullOrWhiteSpace($TaskName) -or
-        [string]::IsNullOrWhiteSpace($TaskPath) -or
-        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($TaskName) -or
-        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($TaskPath) -or
-        $TaskName -match "[\\/\x00-\x1f]" -or
-        $TaskPath -match "[\x00-\x1f]" -or
-        $TaskPath.Contains("..") -or
-        -not $TaskPath.EndsWith("\", [System.StringComparison]::Ordinal)
-    ) {
-        return $false
-    }
-
-    return $true
+    return Test-ToolkitOptimizationLiteralTaskIdentity `
+        -TaskName $TaskName `
+        -TaskPath $TaskPath
 }
 
 function Test-ToolkitExecutorTargetScope {
@@ -246,67 +87,24 @@ function Test-ToolkitExecutorTargetScope {
     )
 
     $taskName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
-    $taskPath = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
-    $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
-    $sourceFinding = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
     $targetIdentity = Get-ToolkitFindingPropertyValue -Finding $RollbackManifest -Name "TargetIdentity"
-    $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
-    $recommendation = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Recommendation"
-    $expectedFinding = "${sourceType}: $taskName"
-    $nameAllowed = @(
-        $ExecutionPolicy.TaskNamePatterns |
-            Where-Object {
-                $taskName.IndexOf(
-                    [string]$_,
-                    [System.StringComparison]::OrdinalIgnoreCase
-                ) -ge 0
-            }
-    ).Count -gt 0
-
-    if (-not (Test-ToolkitExecutorLiteralIdentity -TaskName $taskName -TaskPath $taskPath)) {
-        return [PSCustomObject]@{
-            Allowed      = $false
-            DecisionCode = "UnsafeTargetIdentity"
-            Reason       = "The scheduled-task name or path is not a safe literal identity."
-            Remediation  = "Regenerate the plan from a scheduled task with a literal name and path."
-        }
+    $scope = Test-ToolkitOptimizationExecutorScope `
+        -PlanEntry $PlanEntry `
+        -ExecutionPolicy $ExecutionPolicy
+    if (-not $scope.Allowed) {
+        return $scope
     }
 
-    if (
-        -not $taskPath.StartsWith(
-            [string]$ExecutionPolicy.TaskPathPrefix,
-            [System.StringComparison]::OrdinalIgnoreCase
-        )
-    ) {
-        return [PSCustomObject]@{
-            Allowed      = $false
-            DecisionCode = "OutsideDedicatedTaskScope"
-            Reason       = "The scheduled task is outside the dedicated HP task namespace."
-            Remediation  = "Only HP telemetry tasks under the dedicated \HP\ task path are executable."
-        }
-    }
-
-    if (
-        -not $nameAllowed -or
-        -not (Test-ToolkitExecutionStringEquals $category "Telemetry") -or
-        -not (Test-ToolkitExecutionStringEquals $recommendation "Review / likely disable") -or
-        -not (Test-ToolkitExecutionStringEquals $targetIdentity $taskName) -or
-        -not (Test-ToolkitExecutionStringEquals $sourceFinding $expectedFinding)
-    ) {
+    if (-not (Test-ToolkitExecutionStringEquals $targetIdentity $taskName)) {
         return [PSCustomObject]@{
             Allowed      = $false
             DecisionCode = "TargetScopeMismatch"
-            Reason       = "The plan does not identify an allowlisted HP telemetry scheduled task."
-            Remediation  = "Regenerate the plan from the Scheduled Task analyzer and review the source metadata."
+            Reason       = "The rollback target identity does not match the allowlisted scheduled task."
+            Remediation  = "Regenerate the rollback manifest from the current plan and preflight result."
         }
     }
 
-    return [PSCustomObject]@{
-        Allowed      = $true
-        DecisionCode = "TargetScopeAllowed"
-        Reason       = "The target is within the dedicated HP telemetry scheduled-task scope."
-        Remediation  = ""
-    }
+    return $scope
 }
 
 function Get-ToolkitExecutorCurrentObject {
@@ -437,6 +235,13 @@ function Test-ToolkitOptimizationExecutionGate {
     $expectedPlanId = Get-ToolkitStableId `
         -Prefix "OP" `
         -Parts @($expectedSourceFindingId, $actionId)
+    $operationProfile = Get-ToolkitOptimizationOperationProfile `
+        -SourceType (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType") `
+        -Rules $Rules
+    $staticEligibility = Get-ToolkitOptimizationExecutorEligibility `
+        -PlanEntry $PlanEntry `
+        -OperationType ([string]$operationProfile.operationType) `
+        -Rules $Rules
 
     if (
         (Test-ToolkitPermanentExecutorProtection -PlanEntry $PlanEntry) -or
@@ -463,6 +268,11 @@ function Test-ToolkitOptimizationExecutionGate {
         $decisionCode = "InvalidPlanIdentity"
         $reasons.Add("The plan identity does not match its source and action fields.")
         $remediation.Add("Discard altered reports and regenerate the optimizer plan.")
+    }
+    elseif (-not $staticEligibility.Allowed) {
+        $decisionCode = [string]$staticEligibility.DecisionCode
+        $reasons.Add([string]$staticEligibility.Reason)
+        $remediation.Add([string]$staticEligibility.Remediation)
     }
     elseif (-not (ConvertTo-ToolkitExecutionBoolean $Environment.IsAdministrator)) {
         $decisionCode = "AdministratorRequired"

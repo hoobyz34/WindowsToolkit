@@ -15,12 +15,15 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
 
         function New-TestPlanEntry {
             param(
-                [string]$Name = "Contoso Startup Helper",
-                [string]$Type = "Startup Command",
-                [AllowEmptyString()][string]$State = "Enabled",
+                [string]$Name = "HP Telemetry Task",
+                [string]$Type = "ScheduledTask",
+                [AllowEmptyString()][string]$State = "Ready",
                 [string]$ActionId = "review-likely-disable",
-                [string]$Category = "Optional",
+                [string]$Category = "Telemetry",
                 [string]$Risk = "Low",
+                [string]$Vendor = "HP",
+                [string]$Source = "\HP\",
+                [string]$ReportFile = "ScheduledTasks_Report.csv",
                 [bool]$RequiresConfirmation = $true
             )
 
@@ -38,10 +41,10 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
                 -Reason "Test plan entry." `
                 -Confidence "High" `
                 -Category $Category `
-                -Vendor "Contoso" `
+                -Vendor $Vendor `
                 -Recommendation "Review / likely disable" `
-                -Source "Pester" `
-                -ReportFile "Test_Report.csv" `
+                -Source $Source `
+                -ReportFile $ReportFile `
                 -RequiresConfirmation $RequiresConfirmation `
                 -ConfirmationRequirement "Explicit confirmation is required." `
                 -PlanStatus "Pending Review"
@@ -167,6 +170,63 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
         $result.Reasons | Should -Match "protected or core-component"
     }
 
+    It "blocks protected Microsoft scheduled tasks from final eligibility" {
+        $protectedPlans = @(
+            New-TestPlanEntry `
+                -Name "SustainabilityTelemetry" `
+                -Vendor "Microsoft" `
+                -Category "General" `
+                -Source "\Microsoft\Windows\Sustainability\"
+            New-TestPlanEntry `
+                -Name "Microsoft Compatibility Appraiser Exp" `
+                -Vendor "Microsoft" `
+                -Category "General" `
+                -Source "\Microsoft\Windows\Application Experience\"
+        )
+
+        $results = @(
+            New-ToolkitOptimizationPreflight `
+                -PlanEntries $protectedPlans `
+                -Environment $ReadyEnvironment
+        )
+
+        $results.Count | Should -Be 2
+        foreach ($result in $results) {
+            $result.Status | Should -Be "Blocked"
+            $result.EligibilityStatus | Should -Be "Blocked"
+            $result.IsEligible | Should -BeFalse
+            $result.IsBlocked | Should -BeTrue
+            $result.SafetyPolicyResult | Should -Be "Blocked - Protected"
+            $result.Reasons | Should -Match "protected or core-component"
+        }
+    }
+
+    It "blocks candidate actions outside the dedicated executor scope" {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestPlanEntry `
+                    -Source "\Vendor\"
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult | Should -Be "Blocked - Executor Scope"
+        $result.Reasons | Should -Match "outside the dedicated HP task namespace"
+    }
+
+    It "blocks candidate actions not allowlisted for the executor" {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestPlanEntry `
+                    -Vendor "Contoso"
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult | Should -Be "Blocked - Executor Policy"
+        $result.Reasons | Should -Match "No executor policy allowlists"
+    }
+
     It "reports unavailable restore-point readiness without creating one" {
         $environment = [PSCustomObject]@{
             IsWindowsPlatform       = $true
@@ -199,7 +259,7 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
 
         $first.BeforeStateCaptured | Should -BeTrue
         $first.IsReversible | Should -BeTrue
-        $first.BeforeStateSnapshot | Should -Match '"CurrentState":"Enabled"'
+        $first.BeforeStateSnapshot | Should -Match '"CurrentState":"Ready"'
         $first.BeforeStateHash | Should -Be $second.BeforeStateHash
         $first.ManifestId | Should -Be $second.ManifestId
     }

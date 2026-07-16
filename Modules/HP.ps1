@@ -26,6 +26,7 @@ function Add-HPFinding {
         [string]$Name,
 
         [Parameter(Mandatory)]
+        [AllowEmptyString()]
         [string]$Source,
 
         [string]$Version = "",
@@ -43,6 +44,7 @@ function Add-HPFinding {
     $recommendation = Get-ToolkitRecommendation `
         -Text $Text `
         -Type "hp"
+    $resolvedSource = Resolve-ToolkitFindingSource -Source $Source
 
     $script:findings += New-ToolkitFinding `
         -Name $Name `
@@ -52,7 +54,7 @@ function Add-HPFinding {
         -Recommendation $recommendation.Recommendation `
         -Risk $recommendation.Risk `
         -Reason $recommendation.Reason `
-        -Source $Source `
+        -Source $resolvedSource `
         -Version $Version `
         -State $State
 }

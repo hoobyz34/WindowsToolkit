@@ -1,3 +1,18 @@
+function Resolve-ToolkitFindingSource {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$Source
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Source)) {
+        return "Source unavailable"
+    }
+
+    return $Source
+}
+
 function New-ToolkitFinding {
     param(
         [string]$Name,
@@ -20,7 +35,7 @@ function New-ToolkitFinding {
         Recommendation = $Recommendation
         Risk           = $Risk
         Reason         = $Reason
-        Source         = $Source
+        Source         = Resolve-ToolkitFindingSource -Source $Source
         Version        = $Version
         State          = $State
     }
