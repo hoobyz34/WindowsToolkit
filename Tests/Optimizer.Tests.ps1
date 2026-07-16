@@ -43,8 +43,9 @@ Describe "Safe Optimizer Planning" {
 
         @(
             "PlanId", "SourceFindingId", "SourceFinding", "ProposedAction",
-            "CurrentState", "Risk", "Reason", "Confidence", "Category",
-            "RequiresConfirmation", "ConfirmationRequirement"
+            "SourceName", "SourceType", "SourceVersion", "CurrentState",
+            "Risk", "Reason", "Confidence", "Category", "RequiresConfirmation",
+            "ConfirmationRequirement"
         ) | ForEach-Object {
             $entry.PSObject.Properties.Name | Should -Contain $_
         }
@@ -148,6 +149,10 @@ Describe "Safe Optimizer Planning" {
         @($ReviewFinding) | Export-Csv -Path (Join-Path $reportPath "Software_Report.csv") -NoTypeInformation
         @((New-ToolkitOptimizationPlan -Findings @($ReviewFinding))) |
             Export-Csv -Path (Join-Path $reportPath "Optimization_Plan.csv") -NoTypeInformation
+        @([PSCustomObject]@{ PreflightId = "PF-test" }) |
+            Export-Csv -Path (Join-Path $reportPath "Optimization_Preflight.csv") -NoTypeInformation
+        @([PSCustomObject]@{ ManifestId = "RM-test" }) |
+            Export-Csv -Path (Join-Path $reportPath "Rollback_Manifest.csv") -NoTypeInformation
 
         Import-Module "$Root\Core\Summary.psm1" -Force
         @(Get-ToolkitReportFindings -ReportPath $reportPath).Count | Should -Be 1

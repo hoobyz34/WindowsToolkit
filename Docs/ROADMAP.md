@@ -35,12 +35,13 @@ v0.4.0
 - [x] HP Analyzer
 - [x] Inventory Engine standardization
 - [x] Safe Optimizer planning foundation
+- [x] Optimizer preflight validation and rollback manifests
 
 ---
 
 # Current Sprint
 
-v0.4.0 Safe Optimizer planning foundation complete.
+v0.5.0 Optimizer preflight validation and rollback manifests complete.
 
 ---
 
@@ -70,7 +71,7 @@ v0.4.0 Safe Optimizer planning foundation complete.
 
 - Confirmed optimization apply workflow
 - Restore Points
-- Rollback
+- Rollback execution
 
 ---
 

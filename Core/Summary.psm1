@@ -15,6 +15,8 @@ function Get-ToolkitReportFindings {
         "Health_Score.csv"
         "Correlation_Report.csv"
         "Optimization_Plan.csv"
+        "Optimization_Preflight.csv"
+        "Rollback_Manifest.csv"
     )
 
     $findings = foreach (
@@ -121,6 +123,8 @@ function Get-ToolkitInventorySummary {
                     "Health_Score.csv"
                     "Correlation_Report.csv"
                     "Optimization_Plan.csv"
+                    "Optimization_Preflight.csv"
+                    "Rollback_Manifest.csv"
                 )
             } |
             Sort-Object Name |

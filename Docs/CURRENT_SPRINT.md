@@ -2,32 +2,36 @@
 
 ## Release
 
-v0.4.0
+v0.5.0
 
-## Release Status
+## Goal
 
-Safe Optimizer planning foundation complete.
+Add Safe Optimizer preflight validation and rollback-manifest generation.
 
-## Completed
+## Active Tasks
 
-- [x] Safe Optimizer plan-only workflow
+- [x] Read-only preflight validation
+- [x] Rollback-manifest generation
+- [x] CSV and JSON reporting
 
 ## Blockers
 
 None
 
-## Release Commit
+## Next Commit
 
-Finalize v0.4.0 release
+Optimizer preflight and rollback manifests
 
 ## Definition of Done
 
-Optimizer planning consumes standardized Finding objects.
+Every optimization-plan entry receives a standardized preflight result.
 
-Plan actions and safety boundaries come from JSON rules.
+Protected, incomplete, unprivileged, restore-point-unready, and non-reversible actions are blocked with remediation guidance.
 
-CSV and JSON optimization plans export correctly.
+Rollback manifests preserve stable action identity and immutable before-state snapshots.
+
+Preflight and rollback reports export to CSV and JSON without changing Windows state.
 
 Git tag:
 
-v0.4.0
+v0.5.0

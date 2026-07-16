@@ -18,7 +18,12 @@
     "proposedAction": "Retain without optimization",
     "confidence": "High",
     "confirmationRequirement": "Explicit confirmation is required before any future system change; this protected item is not a change candidate.",
-    "planStatus": "Protected"
+    "planStatus": "Protected",
+    "preflight": {
+      "isCandidate": false,
+      "requiresCurrentState": false,
+      "requiresRestorePoint": false
+    }
   },
   "actions": [
     {
@@ -27,7 +32,12 @@
       "proposedAction": "Retain without optimization",
       "confidence": "High",
       "confirmationRequirement": "Explicit confirmation is required before any future system change.",
-      "planStatus": "Retain"
+      "planStatus": "Retain",
+      "preflight": {
+        "isCandidate": false,
+        "requiresCurrentState": false,
+        "requiresRestorePoint": false
+      }
     },
     {
       "id": "retain-review",
@@ -35,7 +45,12 @@
       "proposedAction": "Retain and review dependencies",
       "confidence": "Medium",
       "confirmationRequirement": "Explicit confirmation is required before any future system change.",
-      "planStatus": "Pending Review"
+      "planStatus": "Pending Review",
+      "preflight": {
+        "isCandidate": false,
+        "requiresCurrentState": true,
+        "requiresRestorePoint": false
+      }
     },
     {
       "id": "review-likely-disable",
@@ -43,7 +58,12 @@
       "proposedAction": "Review as a potential future optimization",
       "confidence": "Medium",
       "confirmationRequirement": "Explicit confirmation is required before any future system change.",
-      "planStatus": "Pending Review"
+      "planStatus": "Pending Review",
+      "preflight": {
+        "isCandidate": true,
+        "requiresCurrentState": true,
+        "requiresRestorePoint": true
+      }
     },
     {
       "id": "review",
@@ -51,7 +71,12 @@
       "proposedAction": "Review before considering any future optimization",
       "confidence": "Low",
       "confirmationRequirement": "Explicit confirmation is required before any future system change.",
-      "planStatus": "Pending Review"
+      "planStatus": "Pending Review",
+      "preflight": {
+        "isCandidate": false,
+        "requiresCurrentState": true,
+        "requiresRestorePoint": false
+      }
     }
   ],
   "defaultAction": {
@@ -59,6 +84,102 @@
     "proposedAction": "Review before considering any future optimization",
     "confidence": "Low",
     "confirmationRequirement": "Explicit confirmation is required before any future system change.",
-    "planStatus": "Pending Review"
+    "planStatus": "Pending Review",
+    "preflight": {
+      "isCandidate": false,
+      "requiresCurrentState": true,
+      "requiresRestorePoint": false
+    }
+  },
+  "operationProfiles": [
+    {
+      "sourceTypes": [
+        "Startup Command"
+      ],
+      "operationType": "StartupEntryStateChange",
+      "intendedOperation": "Change the startup entry enabled state.",
+      "requiresAdministrator": true,
+      "reversible": true,
+      "requiredBeforeStateFields": [
+        "SourceName",
+        "Source",
+        "CurrentState"
+      ],
+      "reversibilityStatement": "The startup entry state can be restored from the captured target identity, source, and prior state."
+    },
+    {
+      "sourceTypes": [
+        "Scheduled Task",
+        "ScheduledTask"
+      ],
+      "operationType": "ScheduledTaskStateChange",
+      "intendedOperation": "Change the scheduled task enabled state.",
+      "requiresAdministrator": true,
+      "reversible": true,
+      "requiredBeforeStateFields": [
+        "SourceName",
+        "Source",
+        "CurrentState"
+      ],
+      "reversibilityStatement": "The scheduled task state can be restored from the captured task identity, path, and prior state."
+    },
+    {
+      "sourceTypes": [
+        "Service",
+        "Automatic Service"
+      ],
+      "operationType": "ServiceStateChange",
+      "intendedOperation": "Change the observed service state.",
+      "requiresAdministrator": true,
+      "reversible": false,
+      "requiredBeforeStateFields": [
+        "SourceName",
+        "CurrentState"
+      ],
+      "reversibilityStatement": "This service action is not safely reversible because the current inventory does not capture startup mode, dependencies, and recovery configuration."
+    },
+    {
+      "sourceTypes": [
+        "WindowsFeature"
+      ],
+      "operationType": "WindowsFeatureStateChange",
+      "intendedOperation": "Change the Windows optional feature state.",
+      "requiresAdministrator": true,
+      "reversible": true,
+      "requiredBeforeStateFields": [
+        "SourceName",
+        "CurrentState"
+      ],
+      "reversibilityStatement": "The feature state can be restored when its payload remains available and the captured prior state is preserved."
+    },
+    {
+      "sourceTypes": [
+        "Software",
+        "AppxPackage",
+        "Driver"
+      ],
+      "operationType": "RemovalCandidate",
+      "intendedOperation": "Remove the installed component.",
+      "requiresAdministrator": true,
+      "reversible": false,
+      "requiredBeforeStateFields": [
+        "SourceName",
+        "SourceVersion",
+        "CurrentState"
+      ],
+      "reversibilityStatement": "This removal is not safely reversible because the inventory does not contain a verified reinstall source and dependency-complete recovery procedure."
+    }
+  ],
+  "defaultOperationProfile": {
+    "operationType": "UndefinedOperation",
+    "intendedOperation": "No state-changing operation is defined.",
+    "requiresAdministrator": true,
+    "reversible": false,
+    "requiredBeforeStateFields": [
+      "SourceName",
+      "SourceType",
+      "CurrentState"
+    ],
+    "reversibilityStatement": "The action is not safely reversible because no supported operation profile exists for the source type."
   }
 }

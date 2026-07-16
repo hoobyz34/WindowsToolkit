@@ -110,6 +110,40 @@ function Save-JsonReport {
     return $path
 }
 
+function Save-ToolkitStructuredReports {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$Data,
+
+        [Parameter(Mandatory)]
+        [string[]]$Columns
+    )
+
+    if ($Data.Count -gt 0) {
+        return [PSCustomObject]@{
+            CsvPath = Save-CsvReport -Name $Name -Data $Data
+            JsonPath = Save-JsonReport -Name $Name -Data $Data -Depth 10
+        }
+    }
+
+    $reportPath = Get-ToolkitReportPath
+    $csvPath = Join-Path $reportPath "$Name.csv"
+    $jsonPath = Join-Path $reportPath "$Name.json"
+
+    Set-Content -Path $csvPath -Value ($Columns -join ",") -Encoding utf8
+    Set-Content -Path $jsonPath -Value "[]" -Encoding utf8
+
+    return [PSCustomObject]@{
+        CsvPath = $csvPath
+        JsonPath = $jsonPath
+    }
+}
+
 function Save-ToolkitOptimizationPlanReports {
     [CmdletBinding()]
     param(
@@ -118,30 +152,66 @@ function Save-ToolkitOptimizationPlanReports {
         [object[]]$Plan
     )
 
-    if ($Plan.Count -gt 0) {
-        return [PSCustomObject]@{
-            CsvPath = Save-CsvReport -Name "Optimization_Plan" -Data $Plan
-            JsonPath = Save-JsonReport -Name "Optimization_Plan" -Data $Plan -Depth 10
-        }
-    }
-
-    $reportPath = Get-ToolkitReportPath
-    $csvPath = Join-Path $reportPath "Optimization_Plan.csv"
-    $jsonPath = Join-Path $reportPath "Optimization_Plan.json"
     $columns = @(
         "PlanId", "SourceFindingId", "SourceFinding", "ProposedAction",
-        "ActionId", "CurrentState", "Risk", "Reason", "Confidence",
-        "Category", "Vendor", "Recommendation", "Source", "ReportFile",
-        "RequiresConfirmation", "ConfirmationRequirement", "PlanStatus"
+        "SourceName", "SourceType", "SourceVersion", "ActionId",
+        "CurrentState", "Risk", "Reason", "Confidence", "Category", "Vendor",
+        "Recommendation", "Source", "ReportFile", "RequiresConfirmation",
+        "ConfirmationRequirement", "PlanStatus"
     )
 
-    Set-Content -Path $csvPath -Value ($columns -join ",") -Encoding utf8
-    Set-Content -Path $jsonPath -Value "[]" -Encoding utf8
+    return Save-ToolkitStructuredReports `
+        -Name "Optimization_Plan" `
+        -Data $Plan `
+        -Columns $columns
+}
 
-    return [PSCustomObject]@{
-        CsvPath = $csvPath
-        JsonPath = $jsonPath
-    }
+function Save-ToolkitOptimizationPreflightReports {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$PreflightResults
+    )
+
+    $columns = @(
+        "PreflightId", "PlanId", "SourceFindingId", "ActionId",
+        "SourceFinding", "SourceName", "SourceType", "ProposedAction",
+        "Status", "EligibilityStatus", "IsEligible", "IsBlocked",
+        "ConfirmationRequired", "ConfirmationStatus",
+        "CurrentStateValidationResult", "SafetyPolicyResult",
+        "AdministratorRequired", "AdministratorReady", "RestorePointRequired",
+        "RestorePointCapability", "RestorePointReady", "ReversibilityStatus",
+        "Reasons", "Remediation"
+    )
+
+    return Save-ToolkitStructuredReports `
+        -Name "Optimization_Preflight" `
+        -Data $PreflightResults `
+        -Columns $columns
+}
+
+function Save-ToolkitRollbackManifestReports {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$RollbackManifest
+    )
+
+    $columns = @(
+        "ManifestId", "PreflightId", "PlanId", "SourceFindingId", "ActionId",
+        "SourceFinding", "SourceName", "SourceType", "TargetIdentity",
+        "OperationType", "IntendedOperation", "BeforeStateSnapshot",
+        "BeforeStateHash", "BeforeStateCaptured", "RequiredBeforeStateFields",
+        "MissingBeforeStateFields", "IsReversible", "ReversibilityStatement",
+        "RestorePointRequired", "SafetyPolicyResult"
+    )
+
+    return Save-ToolkitStructuredReports `
+        -Name "Rollback_Manifest" `
+        -Data $RollbackManifest `
+        -Columns $columns
 }
 
 function Save-HtmlReport {
