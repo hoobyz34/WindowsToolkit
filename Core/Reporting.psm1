@@ -157,7 +157,9 @@ function Save-ToolkitOptimizationPlanReports {
         "SourceName", "SourceType", "SourceVersion", "ActionId",
         "CurrentState", "Risk", "Reason", "Confidence", "Category", "Vendor",
         "Recommendation", "Source", "ReportFile", "RequiresConfirmation",
-        "ConfirmationRequirement", "PlanStatus"
+        "ConfirmationRequirement", "PlanStatus", "ServiceName",
+        "ServiceDisplayName", "StartupType", "Dependencies",
+        "RecoveryConfiguration"
     )
 
     return Save-ToolkitStructuredReports `

@@ -76,6 +76,9 @@ Describe "HP Analyzer" {
         $unknown = Get-ToolkitRecommendation `
             -Text "HP Unclassified Component" `
             -Type "HP"
+        $elan = Get-ToolkitRecommendation `
+            -Text "ELAN Touchpad Component HP" `
+            -Type "HP"
 
         $hotkey.Category | Should -Be "Required"
         $hotkey.Recommendation | Should -Be "KEEP"
@@ -83,6 +86,23 @@ Describe "HP Analyzer" {
         $telemetry.Recommendation | Should -Be "Review / likely disable"
         $unknown.Category | Should -Be "Unknown"
         $unknown.Recommendation | Should -Be "Review"
+        $elan.Category | Should -Be "Unknown"
+        $elan.Recommendation | Should -Be "Review"
+    }
+
+    It "uses explicit HP word matching for collision-prone rules" -ForEach @(
+        @{ Text = "ELAN Touchpad Component HP"; Match = "LAN" }
+        @{ Text = "HP PLANar Component"; Match = "LAN" }
+        @{ Text = "HP Buttoned Component"; Match = "Button" }
+        @{ Text = "HP Audiophile Component"; Match = "Audio" }
+        @{ Text = "HP Wolfgang Component"; Match = "Wolf" }
+    ) {
+        $result = Get-ToolkitRecommendation `
+            -Text $Text `
+            -Type "HP"
+
+        $result.Category | Should -Be "Unknown"
+        $result.Recommendation | Should -Be "Review"
     }
 
     It "creates standardized findings for HP discovery sources and reports them" {
@@ -157,6 +177,12 @@ Describe "HP Analyzer" {
             Get-Content "$Root\Data\HP.json" -Raw |
                 ConvertFrom-Json -ErrorAction Stop
         } | Should -Not -Throw
+
+        $rules = Get-Content "$Root\Data\HP.json" -Raw |
+            ConvertFrom-Json
+        foreach ($rule in $rules) {
+            $rule.matchMode | Should -Be "word"
+        }
     }
 
     AfterAll {

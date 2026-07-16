@@ -15,7 +15,7 @@ function Get-ToolkitOptimizationExecutorContract {
         AllowedCurrentStates       = @("Ready", "Disabled")
         ExecutorId                 = "DisableScheduledTask"
         TargetState                = "Disabled"
-        MutatingCommand            = "Disable-ScheduledTask"
+        MutatingCommands           = @("Disable-ScheduledTask")
         RollbackOperationType      = "EnableScheduledTask"
         RollbackTargetState        = "Enabled"
         TaskPathPrefix             = "\HP\"
@@ -37,6 +37,30 @@ function Get-ToolkitOptimizationExecutorContract {
             "OneDrive",
             "Driver Easy"
         )
+    }
+}
+
+function Get-ToolkitOptimizationServiceExecutorContract {
+    [CmdletBinding()]
+    param()
+
+    return [PSCustomObject]@{
+        PolicyId              = "disable-hp-insights-analytics-service"
+        ActionId              = "review-likely-disable"
+        OperationType         = "ServiceStateChange"
+        SourceTypes           = @("Service")
+        Vendor                = "HP"
+        ReportFile            = "Service_Analyzer.csv"
+        AllowedCurrentStates  = @("Running")
+        AllowedStartupTypes   = @("Automatic")
+        ServiceName           = "HpTouchpointAnalyticsService"
+        ServiceDisplayName    = "HP Insights Analytics"
+        ExecutorId            = "DisableService"
+        TargetState           = "Stopped"
+        TargetStartupType     = "Disabled"
+        MutatingCommands      = @("Stop-Service", "Set-Service")
+        RollbackOperationType = "RestoreServiceConfiguration"
+        RollbackTargetState   = "CapturedBeforeState"
     }
 }
 
@@ -67,6 +91,32 @@ function Test-ToolkitOptimizationCollectionContains {
                 Test-ToolkitOptimizationTextEquals -Left $_ -Right $Expected
             }
     ).Count -gt 0
+}
+
+function Test-ToolkitOptimizationCollectionSetEquals {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object[]]$Left,
+        [AllowNull()][object[]]$Right
+    )
+
+    $leftValues = @($Left)
+    $rightValues = @($Right)
+    if ($leftValues.Count -ne $rightValues.Count) {
+        return $false
+    }
+
+    foreach ($value in $rightValues) {
+        if (
+            -not (Test-ToolkitOptimizationCollectionContains `
+                -Values $leftValues `
+                -Expected $value)
+        ) {
+            return $false
+        }
+    }
+
+    return $true
 }
 
 function Get-ToolkitOptimizationConfiguredExecutionPatterns {
@@ -182,7 +232,7 @@ function Get-ToolkitOptimizationExecutionPolicyMatch {
             (Test-ToolkitOptimizationTextEquals $policy.operationType $contract.OperationType) -and
             (Test-ToolkitOptimizationTextEquals $policy.executorId $contract.ExecutorId) -and
             (Test-ToolkitOptimizationTextEquals $policy.targetState $contract.TargetState) -and
-            (Test-ToolkitOptimizationTextEquals $policy.mutatingCommand $contract.MutatingCommand) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $policy.mutatingCommands $contract.MutatingCommands) -and
             (Test-ToolkitOptimizationTextEquals $policy.rollbackOperationType $contract.RollbackOperationType) -and
             (Test-ToolkitOptimizationTextEquals $policy.rollbackTargetState $contract.RollbackTargetState) -and
             (Test-ToolkitOptimizationCollectionContains $policy.allowedTaskPathPrefixes $contract.TaskPathPrefix) -and
@@ -218,6 +268,60 @@ function Get-ToolkitOptimizationExecutionPolicyMatch {
         }
     }
 
+    $serviceContract = Get-ToolkitOptimizationServiceExecutorContract
+    $serviceName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceName"
+    $serviceDisplayName = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ServiceDisplayName"
+    $startupType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "StartupType"
+
+    foreach ($policy in @($Rules.executionPolicies)) {
+        $policyContractValid = (
+            (Test-ToolkitOptimizationTextEquals $policy.id $serviceContract.PolicyId) -and
+            (Test-ToolkitOptimizationTextEquals $policy.actionId $serviceContract.ActionId) -and
+            (Test-ToolkitOptimizationTextEquals $policy.operationType $serviceContract.OperationType) -and
+            (Test-ToolkitOptimizationTextEquals $policy.executorId $serviceContract.ExecutorId) -and
+            (Test-ToolkitOptimizationTextEquals $policy.targetState $serviceContract.TargetState) -and
+            (Test-ToolkitOptimizationTextEquals $policy.targetStartupType $serviceContract.TargetStartupType) -and
+            (Test-ToolkitOptimizationCollectionSetEquals $policy.mutatingCommands $serviceContract.MutatingCommands) -and
+            (Test-ToolkitOptimizationTextEquals $policy.rollbackOperationType $serviceContract.RollbackOperationType) -and
+            (Test-ToolkitOptimizationTextEquals $policy.rollbackTargetState $serviceContract.RollbackTargetState) -and
+            (Test-ToolkitOptimizationTextEquals $policy.serviceName $serviceContract.ServiceName) -and
+            (Test-ToolkitOptimizationTextEquals $policy.serviceDisplayName $serviceContract.ServiceDisplayName)
+        )
+        $planMatchesPolicy = (
+            (Test-ToolkitOptimizationTextEquals $actionId $serviceContract.ActionId) -and
+            (Test-ToolkitOptimizationTextEquals $OperationType $serviceContract.OperationType) -and
+            (Test-ToolkitOptimizationCollectionContains $serviceContract.SourceTypes $sourceType) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.sourceTypes $sourceType) -and
+            (Test-ToolkitOptimizationTextEquals $vendor $serviceContract.Vendor) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedVendors $vendor) -and
+            (Test-ToolkitOptimizationTextEquals $reportFile $serviceContract.ReportFile) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedReportFiles $reportFile) -and
+            (Test-ToolkitOptimizationCollectionContains $serviceContract.AllowedCurrentStates $currentState) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedCurrentStates $currentState) -and
+            (Test-ToolkitOptimizationCollectionContains $serviceContract.AllowedStartupTypes $startupType) -and
+            (Test-ToolkitOptimizationCollectionContains $policy.allowedStartupTypes $startupType) -and
+            (Test-ToolkitOptimizationTextEquals $serviceName $serviceContract.ServiceName) -and
+            (Test-ToolkitOptimizationTextEquals $serviceDisplayName $serviceContract.ServiceDisplayName)
+        )
+
+        if ($policyContractValid -and $planMatchesPolicy) {
+            return [PSCustomObject]@{
+                Id                    = $serviceContract.PolicyId
+                ActionId              = $serviceContract.ActionId
+                OperationType         = $serviceContract.OperationType
+                ExecutorId            = $serviceContract.ExecutorId
+                TargetState           = $serviceContract.TargetState
+                TargetStartupType     = $serviceContract.TargetStartupType
+                RollbackOperationType = $serviceContract.RollbackOperationType
+                RollbackTargetState   = $serviceContract.RollbackTargetState
+                ServiceName           = $serviceContract.ServiceName
+                ServiceDisplayName    = $serviceContract.ServiceDisplayName
+            }
+        }
+    }
+
     return $null
 }
 
@@ -228,65 +332,124 @@ function Test-ToolkitOptimizationExecutorScope {
         [Parameter(Mandatory)][object]$ExecutionPolicy
     )
 
-    $taskName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
-    $taskPath = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
     $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
+    $sourceName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+    $source = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
     $sourceFinding = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
     $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
     $recommendation = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Recommendation"
-    $expectedFinding = "${sourceType}: $taskName"
-    $nameAllowed = @(
-        $ExecutionPolicy.TaskNamePatterns |
-            Where-Object {
-                $taskName.IndexOf(
-                    [string]$_,
-                    [System.StringComparison]::OrdinalIgnoreCase
-                ) -ge 0
+    $expectedFinding = "${sourceType}: $sourceName"
+
+    switch ([string]$ExecutionPolicy.ExecutorId) {
+        "DisableScheduledTask" {
+            $nameAllowed = @(
+                $ExecutionPolicy.TaskNamePatterns |
+                    Where-Object {
+                        $sourceName.IndexOf(
+                            [string]$_,
+                            [System.StringComparison]::OrdinalIgnoreCase
+                        ) -ge 0
+                    }
+            ).Count -gt 0
+
+            if (
+                -not (Test-ToolkitOptimizationLiteralTaskIdentity `
+                    -TaskName $sourceName `
+                    -TaskPath $source)
+            ) {
+                return [PSCustomObject]@{
+                    Allowed      = $false
+                    DecisionCode = "UnsafeTargetIdentity"
+                    Reason       = "The scheduled-task name or path is not a safe literal identity."
+                    Remediation  = "Regenerate the plan from a scheduled task with a literal name and path."
+                }
             }
-    ).Count -gt 0
 
-    if (-not (Test-ToolkitOptimizationLiteralTaskIdentity -TaskName $taskName -TaskPath $taskPath)) {
-        return [PSCustomObject]@{
-            Allowed      = $false
-            DecisionCode = "UnsafeTargetIdentity"
-            Reason       = "The scheduled-task name or path is not a safe literal identity."
-            Remediation  = "Regenerate the plan from a scheduled task with a literal name and path."
+            if (
+                -not $source.StartsWith(
+                    [string]$ExecutionPolicy.TaskPathPrefix,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                )
+            ) {
+                return [PSCustomObject]@{
+                    Allowed      = $false
+                    DecisionCode = "OutsideDedicatedTaskScope"
+                    Reason       = "The scheduled task is outside the dedicated HP task namespace."
+                    Remediation  = "Only HP telemetry tasks under the dedicated \HP\ task path are executable."
+                }
+            }
+
+            if (
+                -not $nameAllowed -or
+                -not (Test-ToolkitOptimizationTextEquals $category "Telemetry") -or
+                -not (Test-ToolkitOptimizationTextEquals $recommendation "Review / likely disable") -or
+                -not (Test-ToolkitOptimizationTextEquals $sourceFinding $expectedFinding)
+            ) {
+                return [PSCustomObject]@{
+                    Allowed      = $false
+                    DecisionCode = "TargetScopeMismatch"
+                    Reason       = "The plan does not identify an allowlisted HP telemetry scheduled task."
+                    Remediation  = "Regenerate the plan from the Scheduled Task analyzer and review the source metadata."
+                }
+            }
+
+            return [PSCustomObject]@{
+                Allowed      = $true
+                DecisionCode = "TargetScopeAllowed"
+                Reason       = "The target is within the dedicated HP telemetry scheduled-task scope."
+                Remediation  = ""
+            }
         }
-    }
 
-    if (
-        -not $taskPath.StartsWith(
-            [string]$ExecutionPolicy.TaskPathPrefix,
-            [System.StringComparison]::OrdinalIgnoreCase
-        )
-    ) {
-        return [PSCustomObject]@{
-            Allowed      = $false
-            DecisionCode = "OutsideDedicatedTaskScope"
-            Reason       = "The scheduled task is outside the dedicated HP task namespace."
-            Remediation  = "Only HP telemetry tasks under the dedicated \HP\ task path are executable."
+        "DisableService" {
+            $serviceName = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ServiceName"
+            $serviceDisplayName = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "ServiceDisplayName"
+            $dependencies = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "Dependencies"
+            $recoveryConfiguration = Get-ToolkitFindingPropertyValue `
+                -Finding $PlanEntry `
+                -Name "RecoveryConfiguration"
+
+            if (
+                -not (Test-ToolkitOptimizationTextEquals $serviceName $ExecutionPolicy.ServiceName) -or
+                -not (Test-ToolkitOptimizationTextEquals $serviceDisplayName $ExecutionPolicy.ServiceDisplayName) -or
+                -not (Test-ToolkitOptimizationTextEquals $sourceName $ExecutionPolicy.ServiceDisplayName) -or
+                -not (Test-ToolkitOptimizationTextEquals $source "Windows Service") -or
+                -not (Test-ToolkitOptimizationTextEquals $category "Telemetry") -or
+                -not (Test-ToolkitOptimizationTextEquals $recommendation "Review / likely disable") -or
+                -not (Test-ToolkitOptimizationTextEquals $sourceFinding $expectedFinding) -or
+                [string]::IsNullOrWhiteSpace($dependencies) -or
+                [string]::IsNullOrWhiteSpace($recoveryConfiguration)
+            ) {
+                return [PSCustomObject]@{
+                    Allowed      = $false
+                    DecisionCode = "TargetScopeMismatch"
+                    Reason       = "The plan does not contain the exact allowlisted HP Insights Analytics service identity and complete service safety metadata."
+                    Remediation  = "Regenerate the Service Analyzer report with service identity, startup, dependency, and recovery data."
+                }
+            }
+
+            return [PSCustomObject]@{
+                Allowed      = $true
+                DecisionCode = "TargetScopeAllowed"
+                Reason       = "The target is the exact allowlisted HP Insights Analytics service."
+                Remediation  = ""
+            }
         }
-    }
 
-    if (
-        -not $nameAllowed -or
-        -not (Test-ToolkitOptimizationTextEquals $category "Telemetry") -or
-        -not (Test-ToolkitOptimizationTextEquals $recommendation "Review / likely disable") -or
-        -not (Test-ToolkitOptimizationTextEquals $sourceFinding $expectedFinding)
-    ) {
-        return [PSCustomObject]@{
-            Allowed      = $false
-            DecisionCode = "TargetScopeMismatch"
-            Reason       = "The plan does not identify an allowlisted HP telemetry scheduled task."
-            Remediation  = "Regenerate the plan from the Scheduled Task analyzer and review the source metadata."
+        default {
+            return [PSCustomObject]@{
+                Allowed      = $false
+                DecisionCode = "UnsupportedExecutorScope"
+                Reason       = "No executor scope validator exists for this operation."
+                Remediation  = "Retain the item; no supported executor capability matches it."
+            }
         }
-    }
-
-    return [PSCustomObject]@{
-        Allowed      = $true
-        DecisionCode = "TargetScopeAllowed"
-        Reason       = "The target is within the dedicated HP telemetry scheduled-task scope."
-        Remediation  = ""
     }
 }
 
@@ -323,21 +486,27 @@ function Get-ToolkitOptimizationExecutorEligibility {
             DecisionCode       = "ExecutionPolicyDenied"
             SafetyPolicyResult = "Blocked - Executor Policy"
             Reason             = "No executor policy allowlists this action, source type, operation type, vendor, report source, and current state."
-            Remediation        = "Retain the item or regenerate it from the dedicated HP Scheduled Task analyzer path."
+            Remediation        = "Retain the item or regenerate it from the exact analyzer path required by a supported executor policy."
             ExecutionPolicy    = $null
         }
     }
 
-    if (
-        Test-ToolkitOptimizationTextEquals `
-            (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "CurrentState") `
-            $executionPolicy.TargetState
-    ) {
+    $atTargetState = Test-ToolkitOptimizationTextEquals `
+        (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "CurrentState") `
+        $executionPolicy.TargetState
+    $atTargetStartupType = (
+        (Test-ToolkitOptimizationTextEquals $executionPolicy.ExecutorId "DisableService") -and
+        (Test-ToolkitOptimizationTextEquals `
+            (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "StartupType") `
+            $executionPolicy.TargetStartupType)
+    )
+
+    if ($atTargetState -or $atTargetStartupType) {
         return [PSCustomObject]@{
             Allowed            = $false
             DecisionCode       = "AlreadyAtTargetState"
             SafetyPolicyResult = "Blocked - Target State"
-            Reason             = "The scheduled task is already in the executor target state."
+            Reason             = "The target is already in the executor target configuration."
             Remediation        = "No action is required; regenerate reports if the plan still proposes this change."
             ExecutionPolicy    = $executionPolicy
         }
@@ -421,6 +590,49 @@ function Get-ToolkitFindingPropertyValue {
     }
 
     return [string]$property.Value
+}
+
+function Get-ToolkitOptimizationSourceIdentityParts {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$Finding
+    )
+
+    $parts = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in @(
+        "SourceType",
+        "SourceName",
+        "Source",
+        "SourceVersion",
+        "ReportFile"
+    )) {
+        $findingName = switch ($name) {
+            "SourceType" { "Type" }
+            "SourceName" { "Name" }
+            "SourceVersion" { "Version" }
+            default { $name }
+        }
+        $value = Get-ToolkitFindingPropertyValue `
+            -Finding $Finding `
+            -Name $name `
+            -Default (Get-ToolkitFindingPropertyValue -Finding $Finding -Name $findingName)
+        $parts.Add($value)
+    }
+
+    $serviceValues = @(
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceName"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceDisplayName"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "StartupType"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Dependencies"
+        Get-ToolkitFindingPropertyValue -Finding $Finding -Name "RecoveryConfiguration"
+    )
+    if (@($serviceValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
+        foreach ($value in $serviceValues) {
+            $parts.Add([string]$value)
+        }
+    }
+
+    return $parts.ToArray()
 }
 
 function Test-ToolkitProtectedFinding {
@@ -581,7 +793,9 @@ function ConvertTo-ToolkitOptimizationPlanEntry {
     $version = Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Version"
     $reportFile = Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ReportFile"
     $action = Get-ToolkitOptimizationActionRule -Finding $Finding -Rules $Rules
-    $sourceFindingId = Get-ToolkitStableId -Prefix "TF" -Parts @($type, $name, $source, $version, $reportFile)
+    $sourceFindingId = Get-ToolkitStableId `
+        -Prefix "TF" `
+        -Parts (Get-ToolkitOptimizationSourceIdentityParts -Finding $Finding)
     $planId = Get-ToolkitStableId -Prefix "OP" -Parts @($sourceFindingId, [string]$action.id)
     $confidence = Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Confidence" -Default ([string]$action.confidence)
 
@@ -603,6 +817,11 @@ function ConvertTo-ToolkitOptimizationPlanEntry {
         -Recommendation (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Recommendation" -Default "Review") `
         -Source $source `
         -ReportFile $reportFile `
+        -ServiceName (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceName") `
+        -ServiceDisplayName (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "ServiceDisplayName") `
+        -StartupType (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "StartupType") `
+        -Dependencies (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "Dependencies") `
+        -RecoveryConfiguration (Get-ToolkitFindingPropertyValue -Finding $Finding -Name "RecoveryConfiguration") `
         -RequiresConfirmation $true `
         -ConfirmationRequirement ([string]$action.confirmationRequirement) `
         -PlanStatus ([string]$action.planStatus)
@@ -871,6 +1090,11 @@ function ConvertTo-ToolkitRollbackManifestEntry {
         Risk           = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Risk"
         Recommendation = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Recommendation"
         ReportFile     = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ReportFile"
+        ServiceName    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceName"
+        ServiceDisplayName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceDisplayName"
+        StartupType    = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "StartupType"
+        Dependencies   = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Dependencies"
+        RecoveryConfiguration = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "RecoveryConfiguration"
     }
     $requiredBeforeStateFields = @($operationProfile.requiredBeforeStateFields)
     $missingBeforeStateFields = @(
@@ -904,6 +1128,11 @@ function ConvertTo-ToolkitRollbackManifestEntry {
         -Prefix "RM" `
         -Parts @($planId, $actionId, $beforeStateHash)
 
+    $targetIdentity = Get-ToolkitFindingPropertyValue `
+        -Finding $PlanEntry `
+        -Name "ServiceName" `
+        -Default $sourceName
+
     return New-ToolkitRollbackManifestEntry `
         -ManifestId $manifestId `
         -PreflightId (Get-ToolkitFindingPropertyValue -Finding $PreflightResult -Name "PreflightId") `
@@ -913,7 +1142,7 @@ function ConvertTo-ToolkitRollbackManifestEntry {
         -SourceFinding (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding") `
         -SourceName $sourceName `
         -SourceType $sourceType `
-        -TargetIdentity $sourceName `
+        -TargetIdentity $targetIdentity `
         -OperationType ([string]$operationProfile.operationType) `
         -IntendedOperation ([string]$operationProfile.intendedOperation) `
         -BeforeStateSnapshot $beforeStateSnapshot `

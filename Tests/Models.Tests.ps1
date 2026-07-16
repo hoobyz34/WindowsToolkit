@@ -104,4 +104,29 @@ Describe "Finding Model" {
         $finding.Source | Should -Be "hpdevice.inf"
     }
 
+    It "preserves exact service rollback metadata" {
+        $finding = New-ToolkitFinding `
+            -Name "HP Insights Analytics" `
+            -Type "Service" `
+            -Vendor "HP" `
+            -Category "Telemetry" `
+            -Recommendation "Review / likely disable" `
+            -Risk "Low" `
+            -Reason "HP telemetry service." `
+            -Source "Windows Service" `
+            -State "Running" `
+            -ServiceName "HpTouchpointAnalyticsService" `
+            -ServiceDisplayName "HP Insights Analytics" `
+            -StartupType "Automatic" `
+            -Dependencies '["ProfSvc","rpcss"]' `
+            -RecoveryConfiguration '{"FailureActionsPresent":true}'
+
+        $finding.ServiceName | Should -Be "HpTouchpointAnalyticsService"
+        $finding.ServiceDisplayName | Should -Be "HP Insights Analytics"
+        $finding.StartupType | Should -Be "Automatic"
+        $finding.Dependencies | Should -Be '["ProfSvc","rpcss"]'
+        $finding.RecoveryConfiguration |
+            Should -Be '{"FailureActionsPresent":true}'
+    }
+
 }

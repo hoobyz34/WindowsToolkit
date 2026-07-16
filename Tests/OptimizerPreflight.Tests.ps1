@@ -49,6 +49,39 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
                 -ConfirmationRequirement "Explicit confirmation is required." `
                 -PlanStatus "Pending Review"
         }
+
+        function New-TestServicePlanEntry {
+            param(
+                [string]$ServiceName = "HpTouchpointAnalyticsService",
+                [string]$DisplayName = "HP Insights Analytics",
+                [string]$StartupType = "Automatic",
+                [string]$State = "Running",
+                [string]$Dependencies = '["ProfSvc","rpcss"]',
+                [string]$RecoveryConfiguration = '{"FailureActionsPresent":true,"FailureActionsBase64":"AQIDBA==","FailureActionsOnNonCrashFailures":"1"}'
+            )
+
+            $finding = New-ToolkitFinding `
+                -Name $DisplayName `
+                -Type "Service" `
+                -Vendor "HP" `
+                -Category "Telemetry" `
+                -Recommendation "Review / likely disable" `
+                -Risk "Low" `
+                -Reason "HP analytics telemetry service." `
+                -Source "Windows Service" `
+                -State $State `
+                -ServiceName $ServiceName `
+                -ServiceDisplayName $DisplayName `
+                -StartupType $StartupType `
+                -Dependencies $Dependencies `
+                -RecoveryConfiguration $RecoveryConfiguration
+            $finding |
+                Add-Member `
+                    -NotePropertyName ReportFile `
+                    -NotePropertyValue "Service_Analyzer.csv"
+
+            return ConvertTo-ToolkitOptimizationPlanEntry -Finding $finding
+        }
     }
 
     BeforeEach {
@@ -225,6 +258,78 @@ Describe "Safe Optimizer Preflight and Rollback Manifests" {
         $result.IsEligible | Should -BeFalse
         $result.SafetyPolicyResult | Should -Be "Blocked - Executor Policy"
         $result.Reasons | Should -Match "No executor policy allowlists"
+    }
+
+    It "marks only the exact HP Insights Analytics service confirmation-required" {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (New-TestServicePlanEntry) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeTrue
+        $result.Status | Should -Be "Confirmation Required"
+        $result.SafetyPolicyResult | Should -Be "Allowed"
+        $result.ReversibilityStatus | Should -Be "Reversible"
+    }
+
+    It "captures and hashes the complete HP service before-state" {
+        $plan = New-TestServicePlanEntry
+        $preflight = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry $plan `
+            -Environment $ReadyEnvironment
+        $manifest = ConvertTo-ToolkitRollbackManifestEntry `
+            -PlanEntry $plan `
+            -PreflightResult $preflight
+        $snapshot = $manifest.BeforeStateSnapshot | ConvertFrom-Json
+
+        $manifest.TargetIdentity | Should -Be "HpTouchpointAnalyticsService"
+        $manifest.OperationType | Should -Be "ServiceStateChange"
+        $manifest.BeforeStateCaptured | Should -BeTrue
+        $manifest.IsReversible | Should -BeTrue
+        $snapshot.ServiceName | Should -Be "HpTouchpointAnalyticsService"
+        $snapshot.ServiceDisplayName | Should -Be "HP Insights Analytics"
+        $snapshot.StartupType | Should -Be "Automatic"
+        $snapshot.CurrentState | Should -Be "Running"
+        $snapshot.Dependencies | Should -Be '["ProfSvc","rpcss"]'
+        $snapshot.RecoveryConfiguration |
+            Should -Match "FailureActionsBase64"
+        $manifest.BeforeStateHash |
+            Should -Be (Get-ToolkitStableId -Prefix "BS" -Parts @($manifest.BeforeStateSnapshot))
+    }
+
+    It "blocks service candidates with incomplete rollback metadata" {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestServicePlanEntry -RecoveryConfiguration ""
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult | Should -Be "Blocked - Executor Scope"
+        $result.Reasons | Should -Match "complete service safety metadata"
+    }
+
+    It "blocks service identities other than the exact allowlisted service" {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestServicePlanEntry `
+                    -ServiceName "HpOtherAnalyticsService"
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult | Should -Be "Blocked - Executor Policy"
+    }
+
+    It "blocks a lookalike service display name" {
+        $result = ConvertTo-ToolkitOptimizationPreflightResult `
+            -PlanEntry (
+                New-TestServicePlanEntry `
+                    -DisplayName "HP Insights Analytics Helper"
+            ) `
+            -Environment $ReadyEnvironment
+
+        $result.IsEligible | Should -BeFalse
+        $result.SafetyPolicyResult | Should -Be "Blocked - Executor Policy"
     }
 
     It "reports unavailable restore-point readiness without creating one" {

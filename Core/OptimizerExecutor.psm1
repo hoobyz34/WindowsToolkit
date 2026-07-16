@@ -1,5 +1,6 @@
 Import-Module (Join-Path $PSScriptRoot "Models.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "Optimizer.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "Discovery.psm1") -Force
 
 function ConvertTo-ToolkitExecutionBoolean {
     [CmdletBinding()]
@@ -86,7 +87,6 @@ function Test-ToolkitExecutorTargetScope {
         [Parameter(Mandatory)][object]$ExecutionPolicy
     )
 
-    $taskName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
     $targetIdentity = Get-ToolkitFindingPropertyValue -Finding $RollbackManifest -Name "TargetIdentity"
     $scope = Test-ToolkitOptimizationExecutorScope `
         -PlanEntry $PlanEntry `
@@ -95,11 +95,20 @@ function Test-ToolkitExecutorTargetScope {
         return $scope
     }
 
-    if (-not (Test-ToolkitExecutionStringEquals $targetIdentity $taskName)) {
+    $expectedTargetIdentity = if (
+        Test-ToolkitExecutionStringEquals $ExecutionPolicy.ExecutorId "DisableService"
+    ) {
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ServiceName"
+    }
+    else {
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+    }
+
+    if (-not (Test-ToolkitExecutionStringEquals $targetIdentity $expectedTargetIdentity)) {
         return [PSCustomObject]@{
             Allowed      = $false
             DecisionCode = "TargetScopeMismatch"
-            Reason       = "The rollback target identity does not match the allowlisted scheduled task."
+            Reason       = "The rollback target identity does not match the exact allowlisted target."
             Remediation  = "Regenerate the rollback manifest from the current plan and preflight result."
         }
     }
@@ -175,10 +184,104 @@ function Get-ToolkitExecutorCurrentObject {
             }
         }
 
+        "DisableService" {
+            $expectedName = [string]$RollbackManifest.TargetIdentity
+            $service = Get-ToolkitServiceInventoryRecord -Name $expectedName
+
+            if (
+                -not (Test-ToolkitExecutionStringEquals $service.Name $ExecutionPolicy.ServiceName) -or
+                -not (Test-ToolkitExecutionStringEquals $service.DisplayName $ExecutionPolicy.ServiceDisplayName)
+            ) {
+                throw "The live service identity does not exactly match the allowlisted HP Insights Analytics service."
+            }
+
+            return [PSCustomObject]@{
+                Name                  = [string]$service.Name
+                DisplayName           = [string]$service.DisplayName
+                State                 = [string]$service.State
+                StartupType           = [string]$service.StartupType
+                Dependencies          = [string]$service.Dependencies
+                RecoveryConfiguration = [string]$service.RecoveryConfiguration
+            }
+        }
+
         default {
             throw "Unsupported executor."
         }
     }
+}
+
+function Test-ToolkitExecutorBeforeStateMatch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$CurrentObject,
+        [Parameter(Mandatory)][object]$PlanEntry,
+        [Parameter(Mandatory)][object]$BeforeState,
+        [Parameter(Mandatory)][object]$ExecutionPolicy
+    )
+
+    switch ([string]$ExecutionPolicy.ExecutorId) {
+        "DisableScheduledTask" {
+            return (
+                (Test-ToolkitExecutionStringEquals $CurrentObject.State $PlanEntry.CurrentState) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.State $BeforeState.CurrentState)
+            )
+        }
+
+        "DisableService" {
+            return (
+                (Test-ToolkitExecutionStringEquals $CurrentObject.Name $PlanEntry.ServiceName) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.Name $BeforeState.ServiceName) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.DisplayName $PlanEntry.ServiceDisplayName) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.DisplayName $BeforeState.ServiceDisplayName) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.State $PlanEntry.CurrentState) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.State $BeforeState.CurrentState) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.StartupType $PlanEntry.StartupType) -and
+                (Test-ToolkitExecutionStringEquals $CurrentObject.StartupType $BeforeState.StartupType) -and
+                [string]$CurrentObject.Dependencies -ceq [string]$PlanEntry.Dependencies -and
+                [string]$CurrentObject.Dependencies -ceq [string]$BeforeState.Dependencies -and
+                [string]$CurrentObject.RecoveryConfiguration -ceq [string]$PlanEntry.RecoveryConfiguration -and
+                [string]$CurrentObject.RecoveryConfiguration -ceq [string]$BeforeState.RecoveryConfiguration
+            )
+        }
+
+        default {
+            return $false
+        }
+    }
+}
+
+function Test-ToolkitExecutorTargetState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$CurrentObject,
+        [Parameter(Mandatory)][object]$ExecutionPolicy
+    )
+
+    if (Test-ToolkitExecutionStringEquals $ExecutionPolicy.ExecutorId "DisableService") {
+        return (
+            (Test-ToolkitExecutionStringEquals $CurrentObject.State $ExecutionPolicy.TargetState) -and
+            (Test-ToolkitExecutionStringEquals $CurrentObject.StartupType $ExecutionPolicy.TargetStartupType)
+        )
+    }
+
+    return Test-ToolkitExecutionStringEquals `
+        $CurrentObject.State `
+        $ExecutionPolicy.TargetState
+}
+
+function Get-ToolkitExecutorObservedState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$CurrentObject,
+        [Parameter(Mandatory)][object]$ExecutionPolicy
+    )
+
+    if (Test-ToolkitExecutionStringEquals $ExecutionPolicy.ExecutorId "DisableService") {
+        return "State=$($CurrentObject.State);StartupType=$($CurrentObject.StartupType)"
+    }
+
+    return [string]$CurrentObject.State
 }
 
 function New-ToolkitDeniedExecutionGate {
@@ -225,13 +328,7 @@ function Test-ToolkitOptimizationExecutionGate {
     $actionId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId"
     $expectedSourceFindingId = Get-ToolkitStableId `
         -Prefix "TF" `
-        -Parts @(
-            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
-            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
-            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
-            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceVersion"
-            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ReportFile"
-        )
+        -Parts (Get-ToolkitOptimizationSourceIdentityParts -Finding $PlanEntry)
     $expectedPlanId = Get-ToolkitStableId `
         -Prefix "OP" `
         -Parts @($expectedSourceFindingId, $actionId)
@@ -403,11 +500,14 @@ function Test-ToolkitOptimizationExecutionGate {
                                 -PlanEntry $PlanEntry `
                                 -RollbackManifest $RollbackManifest `
                                 -ExecutionPolicy $executionPolicy
-                            $observedState = [string]$currentObject.State
-                            $currentStateValid = (
-                                (Test-ToolkitExecutionStringEquals $observedState $PlanEntry.CurrentState) -and
-                                (Test-ToolkitExecutionStringEquals $observedState $beforeState.CurrentState)
-                            )
+                            $observedState = Get-ToolkitExecutorObservedState `
+                                -CurrentObject $currentObject `
+                                -ExecutionPolicy $executionPolicy
+                            $currentStateValid = Test-ToolkitExecutorBeforeStateMatch `
+                                -CurrentObject $currentObject `
+                                -PlanEntry $PlanEntry `
+                                -BeforeState $beforeState `
+                                -ExecutionPolicy $executionPolicy
                         }
                         catch {
                             $currentStateValid = $false
@@ -419,11 +519,9 @@ function Test-ToolkitOptimizationExecutionGate {
                             $reasons.Add("The live task identity or current state no longer matches the plan and rollback snapshot.")
                             $remediation.Add("Regenerate the plan, preflight result, and rollback manifest before applying.")
                         }
-                        elseif (
-                            Test-ToolkitExecutionStringEquals `
-                                $observedState `
-                                $executionPolicy.TargetState
-                        ) {
+                        elseif (Test-ToolkitExecutorTargetState `
+                            -CurrentObject $currentObject `
+                            -ExecutionPolicy $executionPolicy) {
                             $currentStateValid = $false
                             $decisionCode = "AlreadyAtTargetState"
                             $reasons.Add("The live object is already in the execution policy target state.")
@@ -464,19 +562,29 @@ function Test-ToolkitOptimizationExecutionGate {
 function Invoke-ToolkitAllowedExecutionOperation {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][string]$TaskName,
-        [Parameter(Mandatory)][string]$TaskPath,
-        [Parameter(Mandatory)][ValidateSet("DisableScheduledTask")]
+        [Parameter(Mandatory)][string]$TargetIdentity,
+        [string]$TaskPath = "",
+        [Parameter(Mandatory)][ValidateSet("DisableScheduledTask", "DisableService")]
         [string]$ExecutorId
     )
 
     switch ($ExecutorId) {
         "DisableScheduledTask" {
             Disable-ScheduledTask `
-                -TaskName $TaskName `
+                -TaskName $TargetIdentity `
                 -TaskPath $TaskPath `
                 -ErrorAction Stop |
                 Out-Null
+        }
+
+        "DisableService" {
+            Stop-Service `
+                -Name $TargetIdentity `
+                -ErrorAction Stop
+            Set-Service `
+                -Name $TargetIdentity `
+                -StartupType Disabled `
+                -ErrorAction Stop
         }
     }
 }
@@ -730,7 +838,14 @@ function Invoke-ToolkitOptimizationExecutor {
             continue
         }
 
-        $target = "$($planEntry.Source)$($planEntry.SourceName)"
+        $target = if (
+            Test-ToolkitExecutionStringEquals $policy.ExecutorId "DisableService"
+        ) {
+            "$($planEntry.ServiceName) ($($planEntry.ServiceDisplayName))"
+        }
+        else {
+            "$($planEntry.Source)$($planEntry.SourceName)"
+        }
         $action = "$($policy.ExecutorId) -> $($policy.TargetState)"
         $shouldProcessApproved = $PSCmdlet.ShouldProcess($target, $action)
 
@@ -794,11 +909,13 @@ function Invoke-ToolkitOptimizationExecutor {
         }
 
         $policy = $finalGate.ExecutionPolicy
-        $taskName = [string]$manifestEntry.TargetIdentity
+        $targetIdentity = [string]$manifestEntry.TargetIdentity
         $taskPath = [string]$planEntry.Source
+        $approvedBeforeState = [string]$manifestEntry.BeforeStateSnapshot |
+            ConvertFrom-Json -ErrorAction Stop
         try {
             Invoke-ToolkitAllowedExecutionOperation `
-                -TaskName $taskName `
+                -TargetIdentity $targetIdentity `
                 -TaskPath $taskPath `
                 -ExecutorId $policy.ExecutorId
 
@@ -807,19 +924,23 @@ function Invoke-ToolkitOptimizationExecutor {
                     -PlanEntry $planEntry `
                     -RollbackManifest $manifestEntry `
                     -ExecutionPolicy $policy
-                $observedState = [string]$postObject.State
+                $observedState = Get-ToolkitExecutorObservedState `
+                    -CurrentObject $postObject `
+                    -ExecutionPolicy $policy
             }
             catch {
                 $observedState = ""
                 throw "The operation returned, but post-state validation failed: $($_.Exception.Message)"
             }
 
-            if (-not (Test-ToolkitExecutionStringEquals $observedState $policy.TargetState)) {
-                $rollbackRequired = -not (
-                    Test-ToolkitExecutionStringEquals `
-                        $observedState `
-                        $planEntry.CurrentState
-                )
+            if (-not (Test-ToolkitExecutorTargetState `
+                -CurrentObject $postObject `
+                -ExecutionPolicy $policy)) {
+                $rollbackRequired = -not (Test-ToolkitExecutorBeforeStateMatch `
+                    -CurrentObject $postObject `
+                    -PlanEntry $planEntry `
+                    -BeforeState $approvedBeforeState `
+                    -ExecutionPolicy $policy)
                 New-ToolkitExecutionAuditRecord `
                     -PlanEntry $planEntry `
                     -PreflightResult $preflightResult `
@@ -873,18 +994,22 @@ function Invoke-ToolkitOptimizationExecutor {
                     -PlanEntry $planEntry `
                     -RollbackManifest $manifestEntry `
                     -ExecutionPolicy $policy
-                $observedState = [string]$failureObject.State
+                $observedState = Get-ToolkitExecutorObservedState `
+                    -CurrentObject $failureObject `
+                    -ExecutionPolicy $policy
 
-                if (Test-ToolkitExecutionStringEquals $observedState $policy.TargetState) {
+                if (Test-ToolkitExecutorTargetState `
+                    -CurrentObject $failureObject `
+                    -ExecutionPolicy $policy) {
                     $applied = $true
                     $status = "FailedAfterStateChange"
                     $decisionCode = "ExecutionFailedAfterStateChange"
                 }
-                elseif (
-                    Test-ToolkitExecutionStringEquals `
-                        $observedState `
-                        $planEntry.CurrentState
-                ) {
+                elseif (Test-ToolkitExecutorBeforeStateMatch `
+                    -CurrentObject $failureObject `
+                    -PlanEntry $planEntry `
+                    -BeforeState $approvedBeforeState `
+                    -ExecutionPolicy $policy) {
                     $rollbackRequired = $false
                     $status = "Failed"
                     $decisionCode = "ExecutionFailedNoStateChange"

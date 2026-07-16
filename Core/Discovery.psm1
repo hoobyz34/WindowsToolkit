@@ -3,8 +3,120 @@
     Windows discovery functions for WindowsToolkit.
 #>
 
+function ConvertTo-ToolkitServiceStartupType {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$StartMode
+    )
+
+    switch ($StartMode) {
+        "Auto" { return "Automatic" }
+        "Automatic" { return "Automatic" }
+        "Manual" { return "Manual" }
+        "Disabled" { return "Disabled" }
+        default { return $StartMode }
+    }
+}
+
+function Get-ToolkitServiceRecoveryConfiguration {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ServiceName
+    )
+
+    $path = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+
+    try {
+        $configuration = Get-ItemProperty `
+            -LiteralPath $path `
+            -ErrorAction Stop
+        $failureActionsProperty = $configuration.PSObject.Properties["FailureActions"]
+        $nonCrashProperty = $configuration.PSObject.Properties[
+            "FailureActionsOnNonCrashFailures"
+        ]
+        $failureActions = if (
+            $null -ne $failureActionsProperty -and
+            $null -ne $failureActionsProperty.Value
+        ) {
+            [Convert]::ToBase64String([byte[]]$failureActionsProperty.Value)
+        }
+        else {
+            ""
+        }
+
+        return [ordered]@{
+            FailureActionsPresent = $null -ne $failureActionsProperty
+            FailureActionsBase64 = $failureActions
+            FailureActionsOnNonCrashFailures = if ($null -ne $nonCrashProperty) {
+                [string]$nonCrashProperty.Value
+            }
+            else {
+                ""
+            }
+        } | ConvertTo-Json -Compress
+    }
+    catch {
+        return ""
+    }
+}
+
+function Get-ToolkitServiceInventoryRecord {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [AllowNull()][object]$CimService
+    )
+
+    if ($null -eq $CimService) {
+        $matches = @(
+            Get-CimInstance Win32_Service |
+                Where-Object {
+                    [string]::Equals(
+                        [string]$_.Name,
+                        $Name,
+                        [System.StringComparison]::OrdinalIgnoreCase
+                    )
+                }
+        )
+
+        if ($matches.Count -ne 1) {
+            throw "Expected exactly one service named '$Name'; found $($matches.Count)."
+        }
+
+        $CimService = $matches[0]
+    }
+
+    $serviceController = Get-Service `
+        -Name ([string]$CimService.Name) `
+        -ErrorAction Stop
+    $dependencies = @(
+        $serviceController.ServicesDependedOn |
+            ForEach-Object { [string]$_.Name } |
+            Sort-Object
+    )
+
+    return [PSCustomObject]@{
+        Name                  = [string]$CimService.Name
+        DisplayName           = [string]$CimService.DisplayName
+        PathName              = [string]$CimService.PathName
+        State                 = [string]$CimService.State
+        StartMode             = [string]$CimService.StartMode
+        StartupType           = ConvertTo-ToolkitServiceStartupType `
+            -StartMode ([string]$serviceController.StartType)
+        Dependencies          = ConvertTo-Json `
+            -InputObject $dependencies `
+            -Compress
+        RecoveryConfiguration = Get-ToolkitServiceRecoveryConfiguration `
+            -ServiceName ([string]$CimService.Name)
+    }
+}
+
 function Get-ToolkitServices {
-    Get-CimInstance Win32_Service
+    foreach ($service in Get-CimInstance Win32_Service) {
+        Get-ToolkitServiceInventoryRecord `
+            -Name ([string]$service.Name) `
+            -CimService $service
+    }
 }
 
 function Get-ToolkitStartupCommands {

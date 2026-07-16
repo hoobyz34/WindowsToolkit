@@ -129,14 +129,19 @@
         "Automatic Service"
       ],
       "operationType": "ServiceStateChange",
-      "intendedOperation": "Change the observed service state.",
+      "intendedOperation": "Stop the exact allowlisted service and set its startup type to Disabled.",
       "requiresAdministrator": true,
-      "reversible": false,
+      "reversible": true,
       "requiredBeforeStateFields": [
+        "ServiceName",
+        "ServiceDisplayName",
+        "StartupType",
         "SourceName",
-        "CurrentState"
+        "CurrentState",
+        "Dependencies",
+        "RecoveryConfiguration"
       ],
-      "reversibilityStatement": "This service action is not safely reversible because the current inventory does not capture startup mode, dependencies, and recovery configuration."
+      "reversibilityStatement": "The exact service startup and running state can be restored from the captured immutable identity, dependencies, and recovery configuration."
     },
     {
       "sourceTypes": [
@@ -216,9 +221,42 @@
       ],
       "executorId": "DisableScheduledTask",
       "targetState": "Disabled",
-      "mutatingCommand": "Disable-ScheduledTask",
+      "mutatingCommands": [
+        "Disable-ScheduledTask"
+      ],
       "rollbackOperationType": "EnableScheduledTask",
       "rollbackTargetState": "Enabled"
+    },
+    {
+      "id": "disable-hp-insights-analytics-service",
+      "actionId": "review-likely-disable",
+      "operationType": "ServiceStateChange",
+      "sourceTypes": [
+        "Service"
+      ],
+      "allowedVendors": [
+        "HP"
+      ],
+      "allowedReportFiles": [
+        "Service_Analyzer.csv"
+      ],
+      "allowedCurrentStates": [
+        "Running"
+      ],
+      "allowedStartupTypes": [
+        "Automatic"
+      ],
+      "serviceName": "HpTouchpointAnalyticsService",
+      "serviceDisplayName": "HP Insights Analytics",
+      "executorId": "DisableService",
+      "targetState": "Stopped",
+      "targetStartupType": "Disabled",
+      "mutatingCommands": [
+        "Stop-Service",
+        "Set-Service"
+      ],
+      "rollbackOperationType": "RestoreServiceConfiguration",
+      "rollbackTargetState": "CapturedBeforeState"
     }
   ],
   "executionDefaultDenyReason": "No JSON execution policy allowlists this action, source type, operation type, and vendor combination."

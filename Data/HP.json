@@ -1,6 +1,7 @@
 [
   {
     "match": "Hotkey",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Required",
     "recommendation": "KEEP",
@@ -9,6 +10,7 @@
   },
   {
     "match": "System Event",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Required",
     "recommendation": "KEEP",
@@ -17,6 +19,7 @@
   },
   {
     "match": "Button",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Required",
     "recommendation": "KEEP",
@@ -25,6 +28,7 @@
   },
   {
     "match": "Quick Launch",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Required",
     "recommendation": "KEEP",
@@ -33,6 +37,7 @@
   },
   {
     "match": "Wolf",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Review",
@@ -41,6 +46,7 @@
   },
   {
     "match": "Sure Click",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Review",
@@ -49,6 +55,7 @@
   },
   {
     "match": "Sure Sense",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Review",
@@ -57,6 +64,7 @@
   },
   {
     "match": "Sure Run",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Review",
@@ -65,6 +73,7 @@
   },
   {
     "match": "Sure Recover",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Review",
@@ -73,6 +82,7 @@
   },
   {
     "match": "Client Security",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Review",
@@ -81,6 +91,7 @@
   },
   {
     "match": "Diagnostics",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Optional",
@@ -89,6 +100,7 @@
   },
   {
     "match": "Support Assistant",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Optional",
@@ -97,6 +109,7 @@
   },
   {
     "match": "System Information",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Optional",
@@ -105,6 +118,7 @@
   },
   {
     "match": "BIOS",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Optional",
@@ -113,6 +127,7 @@
   },
   {
     "match": "Firmware",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Recommended",
     "recommendation": "KEEP / Optional",
@@ -121,6 +136,7 @@
   },
   {
     "match": "Insights",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Telemetry",
     "recommendation": "Review / likely disable",
@@ -129,6 +145,7 @@
   },
   {
     "match": "Analytics",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Telemetry",
     "recommendation": "Review / likely disable",
@@ -137,6 +154,7 @@
   },
   {
     "match": "Touchpoint",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Telemetry",
     "recommendation": "Review / likely disable",
@@ -145,6 +163,7 @@
   },
   {
     "match": "Telemetry",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Telemetry",
     "recommendation": "Review / likely disable",
@@ -153,6 +172,7 @@
   },
   {
     "match": "App Helper",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Telemetry",
     "recommendation": "Review / likely disable",
@@ -161,6 +181,7 @@
   },
   {
     "match": "Notifications",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Telemetry",
     "recommendation": "Review / likely disable",
@@ -169,6 +190,7 @@
   },
   {
     "match": "Audio",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Optional",
     "recommendation": "KEEP / Review",
@@ -177,6 +199,7 @@
   },
   {
     "match": "LAN",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Optional",
     "recommendation": "KEEP / Review",
@@ -185,6 +208,7 @@
   },
   {
     "match": "WLAN",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Optional",
     "recommendation": "KEEP / Review",
@@ -193,6 +217,7 @@
   },
   {
     "match": "Network",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Optional",
     "recommendation": "KEEP / Review",
@@ -201,6 +226,7 @@
   },
   {
     "match": "Connection Optimizer",
+    "matchMode": "word",
     "vendor": "HP",
     "category": "Optional",
     "recommendation": "KEEP / Review",

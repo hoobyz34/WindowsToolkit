@@ -3,6 +3,7 @@ $RuleFiles = @(
     "Services.json"
     "Software.json"
     "Drivers.json"
+    "HP.json"
     "AppxPackages.json"
     "Vendors.json"
 )
@@ -29,6 +30,7 @@ Describe "Recommendation Rule Schema" {
         "Services.json"
         "Software.json"
         "Drivers.json"
+        "HP.json"
         "AppxPackages.json"
     )
 
@@ -105,6 +107,18 @@ Describe "Recommendation Rule Schema" {
 
             ($hasMatch -or $hasPatterns -or $isProfileRule) |
                 Should -BeTrue
+        }
+    }
+
+    It "every explicit match mode in <_> is supported" -ForEach $RecommendationFiles {
+        $rules = @(
+            Get-Content "$PSScriptRoot\..\Data\$_" -Raw |
+                ConvertFrom-Json
+        )
+
+        foreach ($rule in $rules | Where-Object matchMode) {
+            [string]$rule.matchMode |
+                Should -BeIn @("contains", "exact", "word")
         }
     }
 }
@@ -187,6 +201,20 @@ Describe "Recommendation Rule Routing" {
 
         $result.Reason |
             Should -Not -BeNullOrEmpty
+    }
+
+    It "honors explicit word matching without substring collisions" {
+        Test-ToolkitRuleTextMatch `
+            -Text "ELAN Touchpad Component" `
+            -Pattern "LAN" `
+            -Mode "word" |
+            Should -BeFalse
+
+        Test-ToolkitRuleTextMatch `
+            -Text "HP LAN Switching Service" `
+            -Pattern "LAN" `
+            -Mode "word" |
+            Should -BeTrue
     }
 }
 

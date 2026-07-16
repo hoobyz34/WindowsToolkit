@@ -68,12 +68,63 @@ Describe "Gated Safe Optimizer Executor" {
                 Manifest  = $manifest
             }
         }
+
+        function New-TestServiceExecutionArtifacts {
+            param(
+                [string]$ServiceName = "HpTouchpointAnalyticsService",
+                [string]$DisplayName = "HP Insights Analytics",
+                [string]$StartupType = "Automatic",
+                [string]$State = "Running",
+                [string]$Dependencies = '["ProfSvc","rpcss"]',
+                [string]$RecoveryConfiguration = '{"FailureActionsPresent":true,"FailureActionsBase64":"AQIDBA==","FailureActionsOnNonCrashFailures":"1"}'
+            )
+
+            $finding = New-ToolkitFinding `
+                -Name $DisplayName `
+                -Type "Service" `
+                -Vendor "HP" `
+                -Category "Telemetry" `
+                -Recommendation "Review / likely disable" `
+                -Risk "Low" `
+                -Reason "HP analytics telemetry service." `
+                -Source "Windows Service" `
+                -State $State `
+                -ServiceName $ServiceName `
+                -ServiceDisplayName $DisplayName `
+                -StartupType $StartupType `
+                -Dependencies $Dependencies `
+                -RecoveryConfiguration $RecoveryConfiguration
+            $finding |
+                Add-Member `
+                    -NotePropertyName ReportFile `
+                    -NotePropertyValue "Service_Analyzer.csv"
+            $plan = ConvertTo-ToolkitOptimizationPlanEntry -Finding $finding
+            $preflight = ConvertTo-ToolkitOptimizationPreflightResult `
+                -PlanEntry $plan `
+                -Environment $ReadyEnvironment
+            $manifest = ConvertTo-ToolkitRollbackManifestEntry `
+                -PlanEntry $plan `
+                -PreflightResult $preflight
+
+            return [PSCustomObject]@{
+                Plan      = $plan
+                Preflight = $preflight
+                Manifest  = $manifest
+            }
+        }
     }
 
     BeforeEach {
         $Global:ToolkitRunPath = Join-Path $TestDrive "ExecutorReports"
         $Global:ToolkitExecutorMockStates = [System.Collections.Generic.Queue[string]]::new()
         $Global:ToolkitExecutorMockStates.Enqueue("Ready")
+        $Global:ToolkitExecutorServiceStates = [System.Collections.Generic.Queue[object]]::new()
+        $Global:ToolkitExecutorServiceStates.Enqueue(
+            [PSCustomObject]@{
+                State       = "Running"
+                StartupType = "Automatic"
+            }
+        )
         Mock Get-ScheduledTask -ModuleName OptimizerExecutor {
             $state = if ($Global:ToolkitExecutorMockStates.Count -gt 0) {
                 $Global:ToolkitExecutorMockStates.Dequeue()
@@ -103,13 +154,46 @@ Describe "Gated Safe Optimizer Executor" {
                 TaskPath = $TaskPath
             }
         }
+        Mock Get-ToolkitServiceInventoryRecord -ModuleName OptimizerExecutor {
+            $state = if ($Global:ToolkitExecutorServiceStates.Count -gt 0) {
+                $Global:ToolkitExecutorServiceStates.Dequeue()
+            }
+            else {
+                [PSCustomObject]@{
+                    State       = "Running"
+                    StartupType = "Automatic"
+                }
+            }
+
+            [PSCustomObject]@{
+                Name                  = "HpTouchpointAnalyticsService"
+                DisplayName           = "HP Insights Analytics"
+                State                 = $state.State
+                StartupType           = $state.StartupType
+                Dependencies          = if ($state.Dependencies) {
+                    $state.Dependencies
+                }
+                else {
+                    '["ProfSvc","rpcss"]'
+                }
+                RecoveryConfiguration = if ($state.RecoveryConfiguration) {
+                    $state.RecoveryConfiguration
+                }
+                else {
+                    '{"FailureActionsPresent":true,"FailureActionsBase64":"AQIDBA==","FailureActionsOnNonCrashFailures":"1"}'
+                }
+            }
+        }
+        Mock Stop-Service -ModuleName OptimizerExecutor {}
+        Mock Set-Service -ModuleName OptimizerExecutor {}
     }
 
     It "defines a narrow JSON execution allowlist" {
         $rules = Get-ToolkitOptimizationActionRules
 
-        $rules.executionPolicies.Count | Should -Be 1
-        $policy = $rules.executionPolicies[0]
+        $rules.executionPolicies.Count | Should -Be 2
+        $policy = $rules.executionPolicies |
+            Where-Object id -eq "disable-hp-scheduled-task"
         $policy.actionId | Should -Be "review-likely-disable"
         $policy.operationType | Should -Be "ScheduledTaskStateChange"
         $policy.allowedVendors | Should -Contain "HP"
@@ -118,7 +202,20 @@ Describe "Gated Safe Optimizer Executor" {
         $policy.allowedTaskPathPrefixes | Should -Contain "\HP\"
         $policy.allowedTaskNamePatterns | Should -Contain "HP Insights"
         $policy.allowedTaskAuthorPatterns | Should -Contain "HP"
-        $policy.mutatingCommand | Should -Be "Disable-ScheduledTask"
+        $policy.mutatingCommands | Should -Contain "Disable-ScheduledTask"
+
+        $servicePolicy = $rules.executionPolicies |
+            Where-Object id -eq "disable-hp-insights-analytics-service"
+        $servicePolicy.serviceName |
+            Should -Be "HpTouchpointAnalyticsService"
+        $servicePolicy.serviceDisplayName |
+            Should -Be "HP Insights Analytics"
+        $servicePolicy.sourceTypes | Should -Be @("Service")
+        $servicePolicy.allowedVendors | Should -Be @("HP")
+        $servicePolicy.allowedReportFiles |
+            Should -Be @("Service_Analyzer.csv")
+        $servicePolicy.mutatingCommands | Should -Contain "Stop-Service"
+        $servicePolicy.mutatingCommands | Should -Contain "Set-Service"
     }
 
     It "exposes plan review and dry-run in the menu without default Apply" {
@@ -161,6 +258,21 @@ Describe "Gated Safe Optimizer Executor" {
         $result.Applied | Should -BeFalse
         $result.DecisionCode | Should -Be "ApplyRequired"
         Should -Invoke Disable-ScheduledTask -ModuleName OptimizerExecutor -Times 0
+    }
+
+    It "defaults the exact HP service capability to dry-run with no mutation" {
+        $artifacts = New-TestServiceExecutionArtifacts
+
+        $result = Invoke-ToolkitOptimizationExecutor `
+            -PlanEntries @($artifacts.Plan) `
+            -PreflightResults @($artifacts.Preflight) `
+            -RollbackManifest @($artifacts.Manifest)
+
+        $result.Status | Should -Be "Preview"
+        $result.DecisionCode | Should -Be "ApplyRequired"
+        $result.Applied | Should -BeFalse
+        Should -Invoke Stop-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 0
     }
 
     It "honors WhatIf and invokes no mutation" {
@@ -417,6 +529,125 @@ Describe "Gated Safe Optimizer Executor" {
             }
     }
 
+    It "executes only the exact allowlisted HP service through mocked commands" {
+        $artifacts = New-TestServiceExecutionArtifacts
+        $Global:ToolkitExecutorServiceStates.Clear()
+        @(
+            [PSCustomObject]@{ State = "Running"; StartupType = "Automatic" }
+            [PSCustomObject]@{ State = "Running"; StartupType = "Automatic" }
+            [PSCustomObject]@{ State = "Stopped"; StartupType = "Disabled" }
+        ) | ForEach-Object {
+            $Global:ToolkitExecutorServiceStates.Enqueue($_)
+        }
+
+        $result = Invoke-ToolkitOptimizationExecutor `
+            -PlanEntries @($artifacts.Plan) `
+            -PreflightResults @($artifacts.Preflight) `
+            -RollbackManifest @($artifacts.Manifest) `
+            -Apply `
+            -Confirmed `
+            -Confirm:$false
+
+        $result.Status | Should -Be "Executed"
+        $result.DecisionCode | Should -Be "Executed"
+        $result.ObservedStateAfter |
+            Should -Be "State=Stopped;StartupType=Disabled"
+        $result.RollbackStatus | Should -Be "Available"
+        Should -Invoke Stop-Service `
+            -ModuleName OptimizerExecutor `
+            -Times 1 `
+            -ParameterFilter {
+                $Name -eq "HpTouchpointAnalyticsService"
+            }
+        Should -Invoke Set-Service `
+            -ModuleName OptimizerExecutor `
+            -Times 1 `
+            -ParameterFilter {
+                $Name -eq "HpTouchpointAnalyticsService" -and
+                $StartupType -eq "Disabled"
+            }
+        Should -Invoke Disable-ScheduledTask `
+            -ModuleName OptimizerExecutor `
+            -Times 0
+    }
+
+    It "denies live HP service dependency or recovery drift" {
+        $artifacts = New-TestServiceExecutionArtifacts
+        $Global:ToolkitExecutorServiceStates.Clear()
+        $Global:ToolkitExecutorServiceStates.Enqueue(
+            [PSCustomObject]@{
+                State                 = "Running"
+                StartupType           = "Automatic"
+                Dependencies          = '["DifferentDependency"]'
+                RecoveryConfiguration = '{"FailureActionsPresent":false,"FailureActionsBase64":"","FailureActionsOnNonCrashFailures":""}'
+            }
+        )
+
+        $result = Invoke-ToolkitOptimizationExecutor `
+            -PlanEntries @($artifacts.Plan) `
+            -PreflightResults @($artifacts.Preflight) `
+            -RollbackManifest @($artifacts.Manifest) `
+            -Apply `
+            -Confirmed `
+            -Confirm:$false
+
+        $result.DecisionCode | Should -Be "StaleCurrentState"
+        $result.CurrentStateValid | Should -BeFalse
+        Should -Invoke Stop-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 0
+    }
+
+    It "denies any service identity other than the exact allowlisted name" {
+        $artifacts = New-TestServiceExecutionArtifacts `
+            -ServiceName "HpOtherAnalyticsService"
+
+        $result = Invoke-ToolkitOptimizationExecutor `
+            -PlanEntries @($artifacts.Plan) `
+            -PreflightResults @($artifacts.Preflight) `
+            -RollbackManifest @($artifacts.Manifest) `
+            -Apply `
+            -Confirmed `
+            -Confirm:$false
+
+        $result.DecisionCode | Should -Be "ExecutionPolicyDenied"
+        Should -Invoke Stop-Service -ModuleName OptimizerExecutor -Times 0
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 0
+    }
+
+    It "records partial HP service failure as rollback-required" {
+        $artifacts = New-TestServiceExecutionArtifacts
+        $Global:ToolkitExecutorServiceStates.Clear()
+        @(
+            [PSCustomObject]@{ State = "Running"; StartupType = "Automatic" }
+            [PSCustomObject]@{ State = "Running"; StartupType = "Automatic" }
+            [PSCustomObject]@{ State = "Stopped"; StartupType = "Automatic" }
+        ) | ForEach-Object {
+            $Global:ToolkitExecutorServiceStates.Enqueue($_)
+        }
+        Mock Set-Service -ModuleName OptimizerExecutor {
+            throw "Mock startup-type failure"
+        }
+
+        $result = Invoke-ToolkitOptimizationExecutor `
+            -PlanEntries @($artifacts.Plan) `
+            -PreflightResults @($artifacts.Preflight) `
+            -RollbackManifest @($artifacts.Manifest) `
+            -Apply `
+            -Confirmed `
+            -Confirm:$false
+
+        $result.Status | Should -Be "Indeterminate"
+        $result.DecisionCode |
+            Should -Be "ExecutionOutcomeIndeterminate"
+        $result.MutationAttempted | Should -BeTrue
+        $result.RollbackRequired | Should -BeTrue
+        $result.RollbackStatus |
+            Should -Be "Required - Not Executed"
+        Should -Invoke Stop-Service -ModuleName OptimizerExecutor -Times 1
+        Should -Invoke Set-Service -ModuleName OptimizerExecutor -Times 1
+        Should -Invoke Disable-ScheduledTask -ModuleName OptimizerExecutor -Times 0
+    }
+
     It "denies a coherently regenerated plan outside the dedicated HP task path" {
         $artifacts = New-TestExecutionArtifacts `
             -Name "HP Telemetry Core Task" `
@@ -519,7 +750,7 @@ Describe "Gated Safe Optimizer Executor" {
             ConvertFrom-Json
         $tamperedRules.executionPolicies[0].allowedTaskNamePatterns = @("*")
         $tamperedRules.executionPolicies[0].allowedTaskPathPrefixes = @("\")
-        $tamperedRules.executionPolicies[0].mutatingCommand = "Invoke-Expression"
+        $tamperedRules.executionPolicies[0].mutatingCommands = @("Invoke-Expression")
         Mock Get-ToolkitOptimizationActionRules -ModuleName OptimizerExecutor {
             $tamperedRules
         }
@@ -733,7 +964,7 @@ Describe "Gated Safe Optimizer Executor" {
         $rules = Get-ToolkitOptimizationActionRules
         $testText = Get-Content -Path $PSCommandPath -Raw
 
-        foreach ($command in @($rules.executionPolicies.mutatingCommand)) {
+        foreach ($command in @($rules.executionPolicies.mutatingCommands)) {
             $testText | Should -Match (
                 "Mock\s+" +
                 [regex]::Escape([string]$command)

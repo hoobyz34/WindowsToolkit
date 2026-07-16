@@ -4,11 +4,12 @@ Import-Module "$Root\Core\Logger.psm1" -Force
 Import-Module "$Root\Core\Console.psm1" -Force
 Import-Module "$Root\Core\Reporting.psm1" -Force
 Import-Module "$Root\Core\Models.psm1" -Force
+Import-Module "$Root\Core\Discovery.psm1" -Force
 Import-Module "$Root\Core\Recommendation.psm1" -Force
 
 Write-Section "Service Analyzer"
 
-$findings = foreach ($service in Get-CimInstance Win32_Service) {
+$findings = foreach ($service in Get-ToolkitServices) {
     $text = "$($service.Name) $($service.DisplayName) $($service.PathName)"
 
     $recommendation = Get-ToolkitRecommendation `
@@ -25,7 +26,12 @@ $findings = foreach ($service in Get-CimInstance Win32_Service) {
         -Reason $recommendation.Reason `
         -Source "Windows Service" `
         -Version "" `
-        -State $service.State
+        -State $service.State `
+        -ServiceName $service.Name `
+        -ServiceDisplayName $service.DisplayName `
+        -StartupType $service.StartupType `
+        -Dependencies $service.Dependencies `
+        -RecoveryConfiguration $service.RecoveryConfiguration
 }
 
 Save-CsvReport `

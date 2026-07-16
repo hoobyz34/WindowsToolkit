@@ -30,7 +30,12 @@ function Add-HPFinding {
         [string]$Source,
 
         [string]$Version = "",
-        [string]$State = ""
+        [string]$State = "",
+        [string]$ServiceName = "",
+        [string]$ServiceDisplayName = "",
+        [string]$StartupType = "",
+        [string]$Dependencies = "",
+        [string]$RecoveryConfiguration = ""
     )
 
     $vendorContext = Get-ToolkitRecommendation `
@@ -56,7 +61,12 @@ function Add-HPFinding {
         -Reason $recommendation.Reason `
         -Source $resolvedSource `
         -Version $Version `
-        -State $State
+        -State $State `
+        -ServiceName $ServiceName `
+        -ServiceDisplayName $ServiceDisplayName `
+        -StartupType $StartupType `
+        -Dependencies $Dependencies `
+        -RecoveryConfiguration $RecoveryConfiguration
 }
 
 foreach ($service in Get-ToolkitServices) {
@@ -66,7 +76,12 @@ foreach ($service in Get-ToolkitServices) {
         -Text "$($service.Name) $($service.DisplayName) $($service.PathName)" `
         -Name $service.DisplayName `
         -Source "Windows Service" `
-        -State $service.State
+        -State $service.State `
+        -ServiceName $service.Name `
+        -ServiceDisplayName $service.DisplayName `
+        -StartupType $service.StartupType `
+        -Dependencies $service.Dependencies `
+        -RecoveryConfiguration $service.RecoveryConfiguration
 }
 
 foreach ($software in Get-ToolkitInstalledSoftware) {

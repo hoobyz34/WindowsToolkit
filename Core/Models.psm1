@@ -24,7 +24,12 @@ function New-ToolkitFinding {
         [string]$Reason,
         [string]$Source = "",
         [string]$Version = "",
-        [string]$State = ""
+        [string]$State = "",
+        [string]$ServiceName = "",
+        [string]$ServiceDisplayName = "",
+        [string]$StartupType = "",
+        [string]$Dependencies = "",
+        [string]$RecoveryConfiguration = ""
     )
 
     [PSCustomObject]@{
@@ -38,6 +43,11 @@ function New-ToolkitFinding {
         Source         = Resolve-ToolkitFindingSource -Source $Source
         Version        = $Version
         State          = $State
+        ServiceName    = $ServiceName
+        ServiceDisplayName = $ServiceDisplayName
+        StartupType    = $StartupType
+        Dependencies   = $Dependencies
+        RecoveryConfiguration = $RecoveryConfiguration
     }
 }
 
@@ -61,6 +71,11 @@ function New-ToolkitOptimizationPlanEntry {
         [string]$Recommendation = "Review",
         [string]$Source = "",
         [string]$ReportFile = "",
+        [string]$ServiceName = "",
+        [string]$ServiceDisplayName = "",
+        [string]$StartupType = "",
+        [string]$Dependencies = "",
+        [string]$RecoveryConfiguration = "",
         [Parameter(Mandatory)][bool]$RequiresConfirmation,
         [Parameter(Mandatory)][string]$ConfirmationRequirement,
         [string]$PlanStatus = "Pending Review"
@@ -84,6 +99,11 @@ function New-ToolkitOptimizationPlanEntry {
         Recommendation          = $Recommendation
         Source                  = $Source
         ReportFile              = $ReportFile
+        ServiceName             = $ServiceName
+        ServiceDisplayName      = $ServiceDisplayName
+        StartupType             = $StartupType
+        Dependencies            = $Dependencies
+        RecoveryConfiguration   = $RecoveryConfiguration
         RequiresConfirmation    = $RequiresConfirmation
         ConfirmationRequirement = $ConfirmationRequirement
         PlanStatus              = $PlanStatus

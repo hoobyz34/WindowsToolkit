@@ -13,6 +13,44 @@ function Get-ToolkitDataFile {
     return Get-Content $path -Raw | ConvertFrom-Json
 }
 
+function Test-ToolkitRuleTextMatch {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$Text,
+        [Parameter(Mandatory)][string]$Pattern,
+        [ValidateSet("contains", "exact", "word")]
+        [string]$Mode = "contains"
+    )
+
+    switch ($Mode) {
+        "exact" {
+            return [string]::Equals(
+                $Text.Trim(),
+                $Pattern.Trim(),
+                [System.StringComparison]::OrdinalIgnoreCase
+            )
+        }
+
+        "word" {
+            $escapedPattern = [regex]::Escape($Pattern)
+            $expression = "(?<![\p{L}\p{Nd}_])$escapedPattern(?![\p{L}\p{Nd}_])"
+            return [regex]::IsMatch(
+                $Text,
+                $expression,
+                [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor
+                    [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+            )
+        }
+
+        default {
+            return $Text.IndexOf(
+                $Pattern,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -ge 0
+        }
+    }
+}
+
 function Find-ToolkitRuleMatch {
     param(
         [string]$Text,
@@ -22,13 +60,31 @@ function Find-ToolkitRuleMatch {
     $rules = Get-ToolkitDataFile -FileName $RuleFile
 
     foreach ($rule in $rules) {
-        if ($rule.match -and $Text -match [regex]::Escape($rule.match)) {
+        $matchMode = if ($rule.matchMode) {
+            [string]$rule.matchMode
+        }
+        else {
+            "contains"
+        }
+
+        if (
+            $rule.match -and
+            (Test-ToolkitRuleTextMatch `
+                -Text $Text `
+                -Pattern ([string]$rule.match) `
+                -Mode $matchMode)
+        ) {
             return $rule
         }
 
         if ($rule.patterns) {
             foreach ($pattern in $rule.patterns) {
-                if ($Text -match [regex]::Escape($pattern)) {
+                if (
+                    Test-ToolkitRuleTextMatch `
+                        -Text $Text `
+                        -Pattern ([string]$pattern) `
+                        -Mode $matchMode
+                ) {
                     return $rule
                 }
             }
