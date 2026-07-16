@@ -214,6 +214,30 @@ function Save-ToolkitRollbackManifestReports {
         -Columns $columns
 }
 
+function Save-ToolkitOptimizationExecutionReports {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$ExecutionResults
+    )
+
+    $columns = @(
+        "ExecutionId", "PlanId", "PreflightId", "ManifestId", "ActionId",
+        "SourceFinding", "SourceName", "SourceType", "OperationType",
+        "ExecutorId", "AttemptMode", "Status", "DecisionCode", "Applied",
+        "ShouldProcessApproved", "PolicyAllowed", "PreflightValid",
+        "ManifestValid", "CurrentStateValid", "ConfirmationProvided",
+        "Reason", "Remediation", "BeforeStateHash", "RollbackOperationType",
+        "RollbackTargetState", "AttemptedAtUtc"
+    )
+
+    return Save-ToolkitStructuredReports `
+        -Name "Optimization_Execution" `
+        -Data $ExecutionResults `
+        -Columns $columns
+}
+
 function Save-HtmlReport {
     [CmdletBinding()]
     param(

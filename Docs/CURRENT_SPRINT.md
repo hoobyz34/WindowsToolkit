@@ -2,36 +2,39 @@
 
 ## Release
 
-v0.5.0
+v0.6.0
 
-## Release Status
+## Goal
 
-Optimizer preflight validation and rollback-manifest generation complete.
+Add a gated Safe Optimizer executor with dry-run as the default.
 
-## Completed
+## Active Tasks
 
-- [x] Read-only preflight validation
-- [x] Rollback-manifest generation
-- [x] CSV and JSON reporting
+- [x] JSON-allowlisted execution policy
+- [x] Dry-run, WhatIf, and confirmation gates
+- [x] Current preflight, live-state, and rollback-manifest validation
+- [x] Standardized execution audit reporting
 
 ## Blockers
 
 None
 
-## Release Commit
+## Next Commit
 
-Finalize v0.5.0 release
+Gated Safe Optimizer executor
 
 ## Definition of Done
 
-Every optimization-plan entry receives a standardized preflight result.
+The menu exposes plan review and dry-run without making Apply the default.
 
-Protected, incomplete, unprivileged, restore-point-unready, and non-reversible actions are blocked with remediation guidance.
+Actual execution requires Apply, explicit confirmation, ShouldProcess approval, a current eligible preflight result, a valid reversible rollback manifest, matching live state, and an exact JSON allowlist match.
 
-Rollback manifests preserve stable action identity and immutable before-state snapshots.
+Protected, unsupported, stale, blocked, non-reversible, and incomplete actions are denied with precise audit reasons.
 
-Preflight and rollback reports export to CSV and JSON without changing Windows state.
+Only HP scheduled-task disable operations are executable with the current architecture; every other operation type remains denied.
+
+Every attempt produces CSV and JSON execution audit records with rollback metadata.
 
 Git tag:
 
-v0.5.0
+v0.6.0

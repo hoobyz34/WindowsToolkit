@@ -181,5 +181,32 @@
       "CurrentState"
     ],
     "reversibilityStatement": "The action is not safely reversible because no supported operation profile exists for the source type."
-  }
+  },
+  "executionPolicies": [
+    {
+      "id": "disable-hp-scheduled-task",
+      "actionId": "review-likely-disable",
+      "operationType": "ScheduledTaskStateChange",
+      "sourceTypes": [
+        "Scheduled Task",
+        "ScheduledTask"
+      ],
+      "allowedVendors": [
+        "HP"
+      ],
+      "allowedReportFiles": [
+        "ScheduledTasks_Report.csv"
+      ],
+      "allowedCurrentStates": [
+        "Ready",
+        "Disabled"
+      ],
+      "executorId": "DisableScheduledTask",
+      "targetState": "Disabled",
+      "mutatingCommand": "Disable-ScheduledTask",
+      "rollbackOperationType": "EnableScheduledTask",
+      "rollbackTargetState": "Enabled"
+    }
+  ],
+  "executionDefaultDenyReason": "No JSON execution policy allowlists this action, source type, operation type, and vendor combination."
 }

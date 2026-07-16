@@ -25,8 +25,9 @@ function Show-Menu {
     Write-Host "11. HTML Inventory Dashboard"
     Write-Host "12. Inventory Health Score"
     Write-Host "13. Cross-Analyzer Correlation"
-    Write-Host "14. Safe Optimizer Plan"
-    Write-Host "15. Exit"
+    Write-Host "14. Safe Optimizer Plan and Preflight"
+    Write-Host "15. Safe Optimizer Dry-Run"
+    Write-Host "16. Exit"
     Write-Host ""
 }
 
@@ -95,6 +96,10 @@ try {
                 Pause
             }
             "15" {
+                & "$ScriptRoot\Modules\OptimizerExecutor.ps1"
+                Pause
+            }
+            "16" {
                 Write-Host "Exiting."
             }
             default {
@@ -102,7 +107,7 @@ try {
                 Pause
             }
         }
-    } while ($choice -ne "15")
+    } while ($choice -ne "16")
 }
 finally {
     Stop-ToolkitSession

@@ -17,6 +17,7 @@ function Get-ToolkitReportFindings {
         "Optimization_Plan.csv"
         "Optimization_Preflight.csv"
         "Rollback_Manifest.csv"
+        "Optimization_Execution.csv"
     )
 
     $findings = foreach (
@@ -125,6 +126,7 @@ function Get-ToolkitInventorySummary {
                     "Optimization_Plan.csv"
                     "Optimization_Preflight.csv"
                     "Rollback_Manifest.csv"
+                    "Optimization_Execution.csv"
                 )
             } |
             Sort-Object Name |

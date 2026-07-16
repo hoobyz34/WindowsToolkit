@@ -153,6 +153,8 @@ Describe "Safe Optimizer Planning" {
             Export-Csv -Path (Join-Path $reportPath "Optimization_Preflight.csv") -NoTypeInformation
         @([PSCustomObject]@{ ManifestId = "RM-test" }) |
             Export-Csv -Path (Join-Path $reportPath "Rollback_Manifest.csv") -NoTypeInformation
+        @([PSCustomObject]@{ ExecutionId = "EX-test" }) |
+            Export-Csv -Path (Join-Path $reportPath "Optimization_Execution.csv") -NoTypeInformation
 
         Import-Module "$Root\Core\Summary.psm1" -Force
         @(Get-ToolkitReportFindings -ReportPath $reportPath).Count | Should -Be 1

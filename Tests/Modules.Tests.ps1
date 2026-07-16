@@ -13,6 +13,7 @@ $AnalyzerFiles = @(
     "Health.ps1"
     "Correlation.ps1"
     "Optimizer.ps1"
+    "OptimizerExecutor.ps1"
 )
 
 Describe "Analyzer Module Integrity" {

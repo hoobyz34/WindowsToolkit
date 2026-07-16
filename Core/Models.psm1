@@ -180,3 +180,64 @@ function New-ToolkitRollbackManifestEntry {
         SafetyPolicyResult        = $SafetyPolicyResult
     }
 }
+
+function New-ToolkitOptimizationExecutionResult {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ExecutionId,
+        [Parameter(Mandatory)][string]$PlanId,
+        [string]$PreflightId = "",
+        [string]$ManifestId = "",
+        [Parameter(Mandatory)][string]$ActionId,
+        [Parameter(Mandatory)][string]$SourceFinding,
+        [Parameter(Mandatory)][string]$SourceName,
+        [Parameter(Mandatory)][string]$SourceType,
+        [Parameter(Mandatory)][string]$OperationType,
+        [string]$ExecutorId = "",
+        [Parameter(Mandatory)][string]$AttemptMode,
+        [Parameter(Mandatory)][string]$Status,
+        [Parameter(Mandatory)][string]$DecisionCode,
+        [Parameter(Mandatory)][bool]$Applied,
+        [Parameter(Mandatory)][bool]$ShouldProcessApproved,
+        [Parameter(Mandatory)][bool]$PolicyAllowed,
+        [Parameter(Mandatory)][bool]$PreflightValid,
+        [Parameter(Mandatory)][bool]$ManifestValid,
+        [Parameter(Mandatory)][bool]$CurrentStateValid,
+        [Parameter(Mandatory)][bool]$ConfirmationProvided,
+        [Parameter(Mandatory)][string]$Reason,
+        [Parameter(Mandatory)][string]$Remediation,
+        [string]$BeforeStateHash = "",
+        [string]$RollbackOperationType = "",
+        [string]$RollbackTargetState = "",
+        [Parameter(Mandatory)][datetime]$AttemptedAtUtc
+    )
+
+    [PSCustomObject]@{
+        ExecutionId             = $ExecutionId
+        PlanId                  = $PlanId
+        PreflightId             = $PreflightId
+        ManifestId              = $ManifestId
+        ActionId                = $ActionId
+        SourceFinding           = $SourceFinding
+        SourceName              = $SourceName
+        SourceType              = $SourceType
+        OperationType           = $OperationType
+        ExecutorId              = $ExecutorId
+        AttemptMode             = $AttemptMode
+        Status                  = $Status
+        DecisionCode            = $DecisionCode
+        Applied                 = $Applied
+        ShouldProcessApproved   = $ShouldProcessApproved
+        PolicyAllowed           = $PolicyAllowed
+        PreflightValid          = $PreflightValid
+        ManifestValid           = $ManifestValid
+        CurrentStateValid       = $CurrentStateValid
+        ConfirmationProvided    = $ConfirmationProvided
+        Reason                  = $Reason
+        Remediation             = $Remediation
+        BeforeStateHash         = $BeforeStateHash
+        RollbackOperationType   = $RollbackOperationType
+        RollbackTargetState     = $RollbackTargetState
+        AttemptedAtUtc          = $AttemptedAtUtc
+    }
+}

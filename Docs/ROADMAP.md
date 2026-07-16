@@ -36,12 +36,13 @@ v0.5.0
 - [x] Inventory Engine standardization
 - [x] Safe Optimizer planning foundation
 - [x] Optimizer preflight validation and rollback manifests
+- [x] Gated Safe Optimizer executor
 
 ---
 
 # Current Sprint
 
-v0.5.0 Optimizer preflight validation and rollback manifests complete.
+v0.6.0 Gated Safe Optimizer executor complete.
 
 ---
 
@@ -69,7 +70,6 @@ v0.5.0 Optimizer preflight validation and rollback manifests complete.
 
 ## Optimization
 
-- Confirmed optimization apply workflow
 - Restore Points
 - Rollback execution
 

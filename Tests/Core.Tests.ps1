@@ -34,4 +34,10 @@ Describe "Core Modules" {
         } | Should -Not -Throw
     }
 
+    It "Optimizer executor module imports" {
+        {
+            Import-Module "$Root\Core\OptimizerExecutor.psm1" -Force
+        } | Should -Not -Throw
+    }
+
 }
