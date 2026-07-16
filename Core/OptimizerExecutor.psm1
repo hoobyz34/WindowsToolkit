@@ -1,6 +1,40 @@
 Import-Module (Join-Path $PSScriptRoot "Models.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "Optimizer.psm1") -Force
 
+$script:ExecutorContract = [PSCustomObject]@{
+    PolicyId                  = "disable-hp-scheduled-task"
+    ActionId                  = "review-likely-disable"
+    OperationType             = "ScheduledTaskStateChange"
+    SourceTypes               = @("Scheduled Task", "ScheduledTask")
+    Vendor                    = "HP"
+    ReportFile                = "ScheduledTasks_Report.csv"
+    AllowedCurrentStates      = @("Ready", "Disabled")
+    ExecutorId                = "DisableScheduledTask"
+    TargetState               = "Disabled"
+    MutatingCommand           = "Disable-ScheduledTask"
+    RollbackOperationType     = "EnableScheduledTask"
+    RollbackTargetState       = "Enabled"
+    TaskPathPrefix            = "\HP\"
+    TaskNamePatterns          = @(
+        "HP Insights",
+        "HP Analytics",
+        "HP Touchpoint",
+        "Telemetry"
+    )
+    TaskAuthorPatterns        = @(
+        "HP",
+        "Hewlett-Packard"
+    )
+    PermanentProtectedPatterns = @(
+        "Microsoft Defender",
+        "Windows Update",
+        "Microsoft Store",
+        "Windows Hello",
+        "OneDrive",
+        "Driver Easy"
+    )
+}
+
 function ConvertTo-ToolkitExecutionBoolean {
     [CmdletBinding()]
     param(
@@ -20,14 +54,64 @@ function ConvertTo-ToolkitExecutionBoolean {
     return $false
 }
 
+function Test-ToolkitExecutionStringEquals {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object]$Left,
+        [AllowNull()][object]$Right
+    )
+
+    return [string]::Equals(
+        [string]$Left,
+        [string]$Right,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )
+}
+
+function Test-ToolkitExecutionCollectionContains {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object[]]$Values,
+        [AllowNull()][object]$Expected
+    )
+
+    return @(
+        @($Values) |
+            Where-Object {
+                Test-ToolkitExecutionStringEquals -Left $_ -Right $Expected
+            }
+    ).Count -gt 0
+}
+
+function Get-ToolkitConfiguredExecutionPatterns {
+    [CmdletBinding()]
+    param(
+        [AllowNull()][object[]]$ConfiguredPatterns,
+        [Parameter(Mandatory)][string[]]$MaximumPatterns
+    )
+
+    return @(
+        foreach ($maximumPattern in $MaximumPatterns) {
+            if (
+                Test-ToolkitExecutionCollectionContains `
+                    -Values $ConfiguredPatterns `
+                    -Expected $maximumPattern
+            ) {
+                $maximumPattern
+            }
+        }
+    )
+}
+
 function Get-ToolkitOptimizationExecutionPolicy {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][object]$PlanEntry,
         [Parameter(Mandatory)][object]$RollbackManifest,
-        [object]$Rules = (Get-ToolkitOptimizationActionRules)
+        [Parameter(Mandatory)][object]$Rules
     )
 
+    $contract = $script:ExecutorContract
     $actionId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId"
     $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
     $vendor = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Vendor"
@@ -38,73 +122,122 @@ function Get-ToolkitOptimizationExecutionPolicy {
         -Name "OperationType"
 
     foreach ($policy in @($Rules.executionPolicies)) {
-        $actionMatches = [string]::Equals(
-            $actionId,
-            [string]$policy.actionId,
-            [System.StringComparison]::OrdinalIgnoreCase
+        $namePatterns = Get-ToolkitConfiguredExecutionPatterns `
+            -ConfiguredPatterns @($policy.allowedTaskNamePatterns) `
+            -MaximumPatterns $contract.TaskNamePatterns
+        $authorPatterns = Get-ToolkitConfiguredExecutionPatterns `
+            -ConfiguredPatterns @($policy.allowedTaskAuthorPatterns) `
+            -MaximumPatterns $contract.TaskAuthorPatterns
+        $policyContractValid = (
+            (Test-ToolkitExecutionStringEquals $policy.id $contract.PolicyId) -and
+            (Test-ToolkitExecutionStringEquals $policy.actionId $contract.ActionId) -and
+            (Test-ToolkitExecutionStringEquals $policy.operationType $contract.OperationType) -and
+            (Test-ToolkitExecutionStringEquals $policy.executorId $contract.ExecutorId) -and
+            (Test-ToolkitExecutionStringEquals $policy.targetState $contract.TargetState) -and
+            (Test-ToolkitExecutionStringEquals $policy.mutatingCommand $contract.MutatingCommand) -and
+            (Test-ToolkitExecutionStringEquals $policy.rollbackOperationType $contract.RollbackOperationType) -and
+            (Test-ToolkitExecutionStringEquals $policy.rollbackTargetState $contract.RollbackTargetState) -and
+            (Test-ToolkitExecutionCollectionContains $policy.allowedTaskPathPrefixes $contract.TaskPathPrefix) -and
+            $namePatterns.Count -gt 0 -and
+            $authorPatterns.Count -gt 0
         )
-        $operationMatches = [string]::Equals(
-            $operationType,
-            [string]$policy.operationType,
-            [System.StringComparison]::OrdinalIgnoreCase
+        $planMatchesPolicy = (
+            (Test-ToolkitExecutionStringEquals $actionId $contract.ActionId) -and
+            (Test-ToolkitExecutionStringEquals $operationType $contract.OperationType) -and
+            (Test-ToolkitExecutionCollectionContains $contract.SourceTypes $sourceType) -and
+            (Test-ToolkitExecutionCollectionContains $policy.sourceTypes $sourceType) -and
+            (Test-ToolkitExecutionStringEquals $vendor $contract.Vendor) -and
+            (Test-ToolkitExecutionCollectionContains $policy.allowedVendors $vendor) -and
+            (Test-ToolkitExecutionStringEquals $reportFile $contract.ReportFile) -and
+            (Test-ToolkitExecutionCollectionContains $policy.allowedReportFiles $reportFile) -and
+            (Test-ToolkitExecutionCollectionContains $contract.AllowedCurrentStates $currentState) -and
+            (Test-ToolkitExecutionCollectionContains $policy.allowedCurrentStates $currentState)
         )
-        $sourceTypeMatches = @(
-            $policy.sourceTypes |
-                Where-Object {
-                    [string]::Equals(
-                        $sourceType,
-                        [string]$_,
-                        [System.StringComparison]::OrdinalIgnoreCase
-                    )
-                }
-        ).Count -gt 0
-        $vendorMatches = @(
-            $policy.allowedVendors |
-                Where-Object {
-                    [string]::Equals(
-                        $vendor,
-                        [string]$_,
-                        [System.StringComparison]::OrdinalIgnoreCase
-                    )
-                }
-        ).Count -gt 0
-        $reportFileMatches = @(
-            $policy.allowedReportFiles |
-                Where-Object {
-                    [string]::Equals(
-                        $reportFile,
-                        [string]$_,
-                        [System.StringComparison]::OrdinalIgnoreCase
-                    )
-                }
-        ).Count -gt 0
-        $currentStateMatches = @(
-            $policy.allowedCurrentStates |
-                Where-Object {
-                    [string]::Equals(
-                        $currentState,
-                        [string]$_,
-                        [System.StringComparison]::OrdinalIgnoreCase
-                    )
-                }
-        ).Count -gt 0
 
-        if (
-            $actionMatches -and
-            $operationMatches -and
-            $sourceTypeMatches -and
-            $vendorMatches -and
-            $reportFileMatches -and
-            $currentStateMatches
-        ) {
-            return $policy
+        if ($policyContractValid -and $planMatchesPolicy) {
+            return [PSCustomObject]@{
+                Id                    = $contract.PolicyId
+                ActionId              = $contract.ActionId
+                OperationType         = $contract.OperationType
+                ExecutorId            = $contract.ExecutorId
+                TargetState           = $contract.TargetState
+                RollbackOperationType = $contract.RollbackOperationType
+                RollbackTargetState   = $contract.RollbackTargetState
+                TaskPathPrefix        = $contract.TaskPathPrefix
+                TaskNamePatterns      = $namePatterns
+                TaskAuthorPatterns    = $authorPatterns
+            }
         }
     }
 
     return $null
 }
 
-function Get-ToolkitExecutorCurrentState {
+function Test-ToolkitPermanentExecutorProtection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$PlanEntry
+    )
+
+    $searchText = @(
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+        Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
+    ) -join " "
+    $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
+    $risk = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Risk"
+    $source = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+
+    if (
+        (Test-ToolkitExecutionStringEquals $category "Required") -or
+        (Test-ToolkitExecutionStringEquals $risk "Critical") -or
+        $source.StartsWith(
+            "\Microsoft\",
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        return $true
+    }
+
+    foreach ($protectedPattern in $script:ExecutorContract.PermanentProtectedPatterns) {
+        if (
+            $searchText.IndexOf(
+                $protectedPattern,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -ge 0
+        ) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-ToolkitExecutorLiteralIdentity {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$TaskName,
+        [Parameter(Mandatory)][string]$TaskPath
+    )
+
+    if (
+        [string]::IsNullOrWhiteSpace($TaskName) -or
+        [string]::IsNullOrWhiteSpace($TaskPath) -or
+        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($TaskName) -or
+        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($TaskPath) -or
+        $TaskName -match "[\\/\x00-\x1f]" -or
+        $TaskPath -match "[\x00-\x1f]" -or
+        $TaskPath.Contains("..") -or
+        -not $TaskPath.EndsWith("\", [System.StringComparison]::Ordinal)
+    ) {
+        return $false
+    }
+
+    return $true
+}
+
+function Test-ToolkitExecutorTargetScope {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][object]$PlanEntry,
@@ -112,23 +245,162 @@ function Get-ToolkitExecutorCurrentState {
         [Parameter(Mandatory)][object]$ExecutionPolicy
     )
 
-    switch ([string]$ExecutionPolicy.executorId) {
-        "DisableScheduledTask" {
-            $task = Get-ScheduledTask `
-                -TaskName ([string]$RollbackManifest.TargetIdentity) `
-                -TaskPath ([string]$PlanEntry.Source) `
-                -ErrorAction Stop
+    $taskName = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+    $taskPath = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+    $sourceType = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
+    $sourceFinding = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding"
+    $targetIdentity = Get-ToolkitFindingPropertyValue -Finding $RollbackManifest -Name "TargetIdentity"
+    $category = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Category"
+    $recommendation = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Recommendation"
+    $expectedFinding = "${sourceType}: $taskName"
+    $nameAllowed = @(
+        $ExecutionPolicy.TaskNamePatterns |
+            Where-Object {
+                $taskName.IndexOf(
+                    [string]$_,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                ) -ge 0
+            }
+    ).Count -gt 0
 
-            if ($null -eq $task) {
-                throw "Scheduled task was not found."
+    if (-not (Test-ToolkitExecutorLiteralIdentity -TaskName $taskName -TaskPath $taskPath)) {
+        return [PSCustomObject]@{
+            Allowed      = $false
+            DecisionCode = "UnsafeTargetIdentity"
+            Reason       = "The scheduled-task name or path is not a safe literal identity."
+            Remediation  = "Regenerate the plan from a scheduled task with a literal name and path."
+        }
+    }
+
+    if (
+        -not $taskPath.StartsWith(
+            [string]$ExecutionPolicy.TaskPathPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        return [PSCustomObject]@{
+            Allowed      = $false
+            DecisionCode = "OutsideDedicatedTaskScope"
+            Reason       = "The scheduled task is outside the dedicated HP task namespace."
+            Remediation  = "Only HP telemetry tasks under the dedicated \HP\ task path are executable."
+        }
+    }
+
+    if (
+        -not $nameAllowed -or
+        -not (Test-ToolkitExecutionStringEquals $category "Telemetry") -or
+        -not (Test-ToolkitExecutionStringEquals $recommendation "Review / likely disable") -or
+        -not (Test-ToolkitExecutionStringEquals $targetIdentity $taskName) -or
+        -not (Test-ToolkitExecutionStringEquals $sourceFinding $expectedFinding)
+    ) {
+        return [PSCustomObject]@{
+            Allowed      = $false
+            DecisionCode = "TargetScopeMismatch"
+            Reason       = "The plan does not identify an allowlisted HP telemetry scheduled task."
+            Remediation  = "Regenerate the plan from the Scheduled Task analyzer and review the source metadata."
+        }
+    }
+
+    return [PSCustomObject]@{
+        Allowed      = $true
+        DecisionCode = "TargetScopeAllowed"
+        Reason       = "The target is within the dedicated HP telemetry scheduled-task scope."
+        Remediation  = ""
+    }
+}
+
+function Get-ToolkitExecutorCurrentObject {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$PlanEntry,
+        [Parameter(Mandatory)][object]$RollbackManifest,
+        [Parameter(Mandatory)][object]$ExecutionPolicy
+    )
+
+    switch ([string]$ExecutionPolicy.ExecutorId) {
+        "DisableScheduledTask" {
+            $expectedName = [string]$RollbackManifest.TargetIdentity
+            $expectedPath = [string]$PlanEntry.Source
+            $tasks = @(
+                Get-ScheduledTask `
+                    -TaskName $expectedName `
+                    -TaskPath $expectedPath `
+                    -ErrorAction Stop
+            )
+
+            if ($tasks.Count -ne 1) {
+                throw "Expected exactly one scheduled task; found $($tasks.Count)."
             }
 
-            return [string]$task.State
+            $task = $tasks[0]
+            if (
+                -not (Test-ToolkitExecutionStringEquals $task.TaskName $expectedName) -or
+                -not (Test-ToolkitExecutionStringEquals $task.TaskPath $expectedPath)
+            ) {
+                throw "The live scheduled-task identity does not exactly match the approved target."
+            }
+
+            $author = ([string]$task.Author).Trim()
+            $authorAllowed = @(
+                $ExecutionPolicy.TaskAuthorPatterns |
+                    Where-Object {
+                        $pattern = [string]$_
+                        if (Test-ToolkitExecutionStringEquals $pattern "HP") {
+                            (Test-ToolkitExecutionStringEquals $author "HP") -or
+                            $author.StartsWith(
+                                "HP ",
+                                [System.StringComparison]::OrdinalIgnoreCase
+                            ) -or
+                            $author.StartsWith(
+                                "HP,",
+                                [System.StringComparison]::OrdinalIgnoreCase
+                            )
+                        }
+                        else {
+                            $author.StartsWith(
+                                $pattern,
+                                [System.StringComparison]::OrdinalIgnoreCase
+                            )
+                        }
+                    }
+            ).Count -gt 0
+
+            if (-not $authorAllowed) {
+                throw "The live scheduled-task author is not an allowlisted HP author."
+            }
+
+            return [PSCustomObject]@{
+                TaskName = [string]$task.TaskName
+                TaskPath = [string]$task.TaskPath
+                State    = [string]$task.State
+                Author   = $author
+            }
         }
 
         default {
-            throw "Unsupported executor: $($ExecutionPolicy.executorId)"
+            throw "Unsupported executor."
         }
+    }
+}
+
+function New-ToolkitDeniedExecutionGate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$DecisionCode,
+        [Parameter(Mandatory)][string]$Reason,
+        [Parameter(Mandatory)][string]$Remediation
+    )
+
+    return [PSCustomObject]@{
+        Allowed           = $false
+        DecisionCode      = $DecisionCode
+        PolicyAllowed     = $false
+        PreflightValid    = $false
+        ManifestValid     = $false
+        CurrentStateValid = $false
+        ExecutionPolicy   = $null
+        Reason            = $Reason
+        Remediation       = $Remediation
     }
 }
 
@@ -138,8 +410,8 @@ function Test-ToolkitOptimizationExecutionGate {
         [Parameter(Mandatory)][object]$PlanEntry,
         [AllowNull()][object]$PreflightResult,
         [AllowNull()][object]$RollbackManifest,
-        [object]$Rules = (Get-ToolkitOptimizationActionRules),
-        [object]$Environment = (Get-ToolkitPreflightEnvironment)
+        [Parameter(Mandatory)][object]$Rules,
+        [Parameter(Mandatory)][object]$Environment
     )
 
     $reasons = [System.Collections.Generic.List[string]]::new()
@@ -153,8 +425,23 @@ function Test-ToolkitOptimizationExecutionGate {
     $planId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "PlanId"
     $sourceFindingId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFindingId"
     $actionId = Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId"
+    $expectedSourceFindingId = Get-ToolkitStableId `
+        -Prefix "TF" `
+        -Parts @(
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType"
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName"
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "Source"
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceVersion"
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ReportFile"
+        )
+    $expectedPlanId = Get-ToolkitStableId `
+        -Prefix "OP" `
+        -Parts @($expectedSourceFindingId, $actionId)
 
-    if (Test-ToolkitProtectedFinding -Finding $PlanEntry -Rules $Rules) {
+    if (
+        (Test-ToolkitPermanentExecutorProtection -PlanEntry $PlanEntry) -or
+        (Test-ToolkitProtectedFinding -Finding $PlanEntry -Rules $Rules)
+    ) {
         $decisionCode = "ProtectedComponent"
         $reasons.Add("The plan entry matches a permanent protected-component policy.")
         $remediation.Add("Retain the protected component; executor policy cannot override this block.")
@@ -169,6 +456,27 @@ function Test-ToolkitOptimizationExecutionGate {
         $reasons.Add("No rollback manifest exists for the plan action.")
         $remediation.Add("Regenerate the rollback manifest with a complete before-state snapshot.")
     }
+    elseif (
+        -not (Test-ToolkitExecutionStringEquals $sourceFindingId $expectedSourceFindingId) -or
+        -not (Test-ToolkitExecutionStringEquals $planId $expectedPlanId)
+    ) {
+        $decisionCode = "InvalidPlanIdentity"
+        $reasons.Add("The plan identity does not match its source and action fields.")
+        $remediation.Add("Discard altered reports and regenerate the optimizer plan.")
+    }
+    elseif (-not (ConvertTo-ToolkitExecutionBoolean $Environment.IsAdministrator)) {
+        $decisionCode = "AdministratorRequired"
+        $reasons.Add("The current process is not running with administrator privileges.")
+        $remediation.Add("Use an elevated session only after reviewing the dry-run output.")
+    }
+    elseif (
+        -not (ConvertTo-ToolkitExecutionBoolean $Environment.RestorePointReady) -or
+        -not (Test-ToolkitExecutionStringEquals $Environment.RestorePointCapability "Available")
+    ) {
+        $decisionCode = "RestorePointNotReady"
+        $reasons.Add("System Restore capability is not ready for the current process.")
+        $remediation.Add("Resolve restore-point readiness before attempting an allowlisted change; the executor will not create a restore point.")
+    }
     else {
         $expectedPreflightId = Get-ToolkitStableId `
             -Prefix "PF" `
@@ -178,25 +486,29 @@ function Test-ToolkitOptimizationExecutionGate {
             -Rules $Rules `
             -Environment $Environment
         $preflightIdentityValid = (
-            [string]$PreflightResult.PreflightId -eq $expectedPreflightId -and
-            [string]$PreflightResult.PlanId -eq $planId -and
-            [string]$PreflightResult.SourceFindingId -eq $sourceFindingId -and
-            [string]$PreflightResult.ActionId -eq $actionId
+            (Test-ToolkitExecutionStringEquals $PreflightResult.PreflightId $expectedPreflightId) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.PlanId $planId) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.SourceFindingId $sourceFindingId) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.ActionId $actionId)
         )
         $preflightStateValid = (
             (ConvertTo-ToolkitExecutionBoolean $PreflightResult.IsEligible) -and
             -not (ConvertTo-ToolkitExecutionBoolean $PreflightResult.IsBlocked) -and
-            [string]$PreflightResult.EligibilityStatus -eq "Eligible" -and
-            [string]$PreflightResult.Status -eq "Confirmation Required" -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.EligibilityStatus "Eligible") -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.Status "Confirmation Required") -and
             (ConvertTo-ToolkitExecutionBoolean $PreflightResult.ConfirmationRequired) -and
-            [string]$PreflightResult.CurrentStateValidationResult -eq "Valid" -and
-            [string]$PreflightResult.SafetyPolicyResult -eq "Allowed" -and
-            [string]$PreflightResult.ReversibilityStatus -eq "Reversible" -and
-            [string]$PreflightResult.Status -eq [string]$currentPreflight.Status -and
-            [string]$PreflightResult.EligibilityStatus -eq [string]$currentPreflight.EligibilityStatus -and
-            [string]$PreflightResult.CurrentStateValidationResult -eq [string]$currentPreflight.CurrentStateValidationResult -and
-            [string]$PreflightResult.SafetyPolicyResult -eq [string]$currentPreflight.SafetyPolicyResult -and
-            [string]$PreflightResult.ReversibilityStatus -eq [string]$currentPreflight.ReversibilityStatus -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.CurrentStateValidationResult "Valid") -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.SafetyPolicyResult "Allowed") -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.ReversibilityStatus "Reversible") -and
+            (ConvertTo-ToolkitExecutionBoolean $PreflightResult.AdministratorRequired) -and
+            (ConvertTo-ToolkitExecutionBoolean $PreflightResult.AdministratorReady) -and
+            (ConvertTo-ToolkitExecutionBoolean $PreflightResult.RestorePointRequired) -and
+            (ConvertTo-ToolkitExecutionBoolean $PreflightResult.RestorePointReady) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.Status $currentPreflight.Status) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.EligibilityStatus $currentPreflight.EligibilityStatus) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.CurrentStateValidationResult $currentPreflight.CurrentStateValidationResult) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.SafetyPolicyResult $currentPreflight.SafetyPolicyResult) -and
+            (Test-ToolkitExecutionStringEquals $PreflightResult.ReversibilityStatus $currentPreflight.ReversibilityStatus) -and
             (ConvertTo-ToolkitExecutionBoolean $PreflightResult.IsEligible) -eq
                 (ConvertTo-ToolkitExecutionBoolean $currentPreflight.IsEligible) -and
             (ConvertTo-ToolkitExecutionBoolean $PreflightResult.IsBlocked) -eq
@@ -206,10 +518,7 @@ function Test-ToolkitOptimizationExecutionGate {
             (ConvertTo-ToolkitExecutionBoolean $PreflightResult.RestorePointReady) -eq
                 (ConvertTo-ToolkitExecutionBoolean $currentPreflight.RestorePointReady)
         )
-        $preflightValid = (
-            $preflightIdentityValid -and
-            $preflightStateValid
-        )
+        $preflightValid = $preflightIdentityValid -and $preflightStateValid
 
         if (-not $preflightValid) {
             $decisionCode = "InvalidOrStalePreflight"
@@ -225,21 +534,27 @@ function Test-ToolkitOptimizationExecutionGate {
                 -Prefix "BS" `
                 -Parts @([string]$RollbackManifest.BeforeStateSnapshot)
             $manifestValid = (
-                [string]$RollbackManifest.PlanId -eq $planId -and
-                [string]$RollbackManifest.SourceFindingId -eq $sourceFindingId -and
-                [string]$RollbackManifest.ActionId -eq $actionId -and
-                [string]$RollbackManifest.PreflightId -eq [string]$PreflightResult.PreflightId -and
-                [string]$RollbackManifest.BeforeStateHash -eq $expectedBeforeStateHash -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.PlanId $planId) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.SourceFindingId $sourceFindingId) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.ActionId $actionId) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.PreflightId $PreflightResult.PreflightId) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.SourceFinding $expectedManifest.SourceFinding) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.SourceName $expectedManifest.SourceName) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.SourceType $expectedManifest.SourceType) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.BeforeStateHash $expectedBeforeStateHash) -and
                 (ConvertTo-ToolkitExecutionBoolean $RollbackManifest.BeforeStateCaptured) -and
                 (ConvertTo-ToolkitExecutionBoolean $RollbackManifest.IsReversible) -and
-                [string]$RollbackManifest.SafetyPolicyResult -eq "Allowed" -and
-                [string]$RollbackManifest.ManifestId -eq [string]$expectedManifest.ManifestId -and
-                [string]$RollbackManifest.OperationType -eq [string]$expectedManifest.OperationType -and
-                [string]$RollbackManifest.TargetIdentity -eq [string]$expectedManifest.TargetIdentity -and
-                [string]$RollbackManifest.BeforeStateSnapshot -eq [string]$expectedManifest.BeforeStateSnapshot -and
-                [string]$RollbackManifest.BeforeStateHash -eq [string]$expectedManifest.BeforeStateHash -and
-                [string]$RollbackManifest.RequiredBeforeStateFields -eq [string]$expectedManifest.RequiredBeforeStateFields -and
-                [string]$RollbackManifest.MissingBeforeStateFields -eq [string]$expectedManifest.MissingBeforeStateFields
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.SafetyPolicyResult "Allowed") -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.ManifestId $expectedManifest.ManifestId) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.OperationType $expectedManifest.OperationType) -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.TargetIdentity $expectedManifest.TargetIdentity) -and
+                [string]$RollbackManifest.BeforeStateSnapshot -ceq
+                    [string]$expectedManifest.BeforeStateSnapshot -and
+                (Test-ToolkitExecutionStringEquals $RollbackManifest.BeforeStateHash $expectedManifest.BeforeStateHash) -and
+                [string]$RollbackManifest.RequiredBeforeStateFields -ceq
+                    [string]$expectedManifest.RequiredBeforeStateFields -and
+                [string]$RollbackManifest.MissingBeforeStateFields -ceq
+                    [string]$expectedManifest.MissingBeforeStateFields
             )
 
             if (-not $manifestValid) {
@@ -256,50 +571,54 @@ function Test-ToolkitOptimizationExecutionGate {
 
                 if (-not $policyAllowed) {
                     $decisionCode = "ExecutionPolicyDenied"
-                    $reasons.Add([string]$Rules.executionDefaultDenyReason)
-                    $remediation.Add("No execution is permitted until a specific JSON policy safely allowlists this operation.")
+                    $reasons.Add("No valid execution policy matches the fixed executor safety contract.")
+                    $remediation.Add("Restore the trusted policy data and regenerate the optimizer reports.")
                 }
                 else {
-                    try {
-                        $beforeState = [string]$RollbackManifest.BeforeStateSnapshot |
-                            ConvertFrom-Json `
-                                -ErrorAction Stop
-                        $observedState = Get-ToolkitExecutorCurrentState `
-                            -PlanEntry $PlanEntry `
-                            -RollbackManifest $RollbackManifest `
-                            -ExecutionPolicy $executionPolicy
-                        $currentStateValid = (
-                            [string]::Equals(
-                                [string]$observedState,
-                                [string]$PlanEntry.CurrentState,
-                                [System.StringComparison]::OrdinalIgnoreCase
-                            ) -and
-                            [string]::Equals(
-                                [string]$observedState,
-                                [string]$beforeState.CurrentState,
-                                [System.StringComparison]::OrdinalIgnoreCase
-                            )
-                        )
-                    }
-                    catch {
-                        $currentStateValid = $false
-                        $reasons.Add("Current state could not be read: $($_.Exception.Message)")
-                    }
+                    $scope = Test-ToolkitExecutorTargetScope `
+                        -PlanEntry $PlanEntry `
+                        -RollbackManifest $RollbackManifest `
+                        -ExecutionPolicy $executionPolicy
 
-                    if (-not $currentStateValid) {
-                        $decisionCode = "StaleCurrentState"
-                        $reasons.Add("The live current state no longer matches the plan and rollback before-state snapshot.")
-                        $remediation.Add("Regenerate the plan, preflight result, and rollback manifest before applying.")
+                    if (-not $scope.Allowed) {
+                        $decisionCode = $scope.DecisionCode
+                        $reasons.Add($scope.Reason)
+                        $remediation.Add($scope.Remediation)
                     }
-                    elseif ([string]::Equals(
-                        [string]$observedState,
-                        [string]$executionPolicy.targetState,
-                        [System.StringComparison]::OrdinalIgnoreCase
-                    )) {
-                        $currentStateValid = $false
-                        $decisionCode = "AlreadyAtTargetState"
-                        $reasons.Add("The live object is already in the execution policy target state.")
-                        $remediation.Add("No action is required; regenerate reports if the plan still proposes this change.")
+                    else {
+                        try {
+                            $beforeState = [string]$RollbackManifest.BeforeStateSnapshot |
+                                ConvertFrom-Json -ErrorAction Stop
+                            $currentObject = Get-ToolkitExecutorCurrentObject `
+                                -PlanEntry $PlanEntry `
+                                -RollbackManifest $RollbackManifest `
+                                -ExecutionPolicy $executionPolicy
+                            $observedState = [string]$currentObject.State
+                            $currentStateValid = (
+                                (Test-ToolkitExecutionStringEquals $observedState $PlanEntry.CurrentState) -and
+                                (Test-ToolkitExecutionStringEquals $observedState $beforeState.CurrentState)
+                            )
+                        }
+                        catch {
+                            $currentStateValid = $false
+                            $reasons.Add("Current target validation failed: $($_.Exception.Message)")
+                        }
+
+                        if (-not $currentStateValid) {
+                            $decisionCode = "StaleCurrentState"
+                            $reasons.Add("The live task identity or current state no longer matches the plan and rollback snapshot.")
+                            $remediation.Add("Regenerate the plan, preflight result, and rollback manifest before applying.")
+                        }
+                        elseif (
+                            Test-ToolkitExecutionStringEquals `
+                                $observedState `
+                                $executionPolicy.TargetState
+                        ) {
+                            $currentStateValid = $false
+                            $decisionCode = "AlreadyAtTargetState"
+                            $reasons.Add("The live object is already in the execution policy target state.")
+                            $remediation.Add("No action is required; regenerate reports if the plan still proposes this change.")
+                        }
                     }
                 }
             }
@@ -335,22 +654,19 @@ function Test-ToolkitOptimizationExecutionGate {
 function Invoke-ToolkitAllowedExecutionOperation {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][object]$PlanEntry,
-        [Parameter(Mandatory)][object]$RollbackManifest,
-        [Parameter(Mandatory)][object]$ExecutionPolicy
+        [Parameter(Mandatory)][string]$TaskName,
+        [Parameter(Mandatory)][string]$TaskPath,
+        [Parameter(Mandatory)][ValidateSet("DisableScheduledTask")]
+        [string]$ExecutorId
     )
 
-    switch ([string]$ExecutionPolicy.executorId) {
+    switch ($ExecutorId) {
         "DisableScheduledTask" {
             Disable-ScheduledTask `
-                -TaskName ([string]$RollbackManifest.TargetIdentity) `
-                -TaskPath ([string]$PlanEntry.Source) `
+                -TaskName $TaskName `
+                -TaskPath $TaskPath `
                 -ErrorAction Stop |
                 Out-Null
-        }
-
-        default {
-            throw "Unsupported executor: $($ExecutionPolicy.executorId)"
         }
     }
 }
@@ -367,8 +683,12 @@ function New-ToolkitExecutionAuditRecord {
         [Parameter(Mandatory)][string]$Status,
         [Parameter(Mandatory)][string]$DecisionCode,
         [Parameter(Mandatory)][bool]$Applied,
+        [Parameter(Mandatory)][bool]$MutationAttempted,
         [Parameter(Mandatory)][bool]$ShouldProcessApproved,
         [Parameter(Mandatory)][bool]$ConfirmationProvided,
+        [string]$ObservedStateAfter = "",
+        [Parameter(Mandatory)][bool]$RollbackRequired,
+        [Parameter(Mandatory)][string]$RollbackStatus,
         [Parameter(Mandatory)][string]$Reason,
         [Parameter(Mandatory)][string]$Remediation
     )
@@ -377,10 +697,12 @@ function New-ToolkitExecutionAuditRecord {
     $executionId = Get-ToolkitStableId `
         -Prefix "EX" `
         -Parts @(
-            [string]$PlanEntry.PlanId,
-            [string]$PlanEntry.ActionId,
-            [string]$RollbackManifest.ManifestId,
-            $AttemptMode,
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "PlanId"
+            Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId"
+            $(if ($null -eq $RollbackManifest) { "" } else {
+                Get-ToolkitFindingPropertyValue -Finding $RollbackManifest -Name "ManifestId"
+            })
+            $AttemptMode
             $attemptedAtUtc.ToString("o")
         )
     $operationType = if ($null -eq $RollbackManifest) {
@@ -395,30 +717,46 @@ function New-ToolkitExecutionAuditRecord {
 
     return New-ToolkitOptimizationExecutionResult `
         -ExecutionId $executionId `
-        -PlanId ([string]$PlanEntry.PlanId) `
-        -PreflightId ([string]$PreflightResult.PreflightId) `
-        -ManifestId ([string]$RollbackManifest.ManifestId) `
-        -ActionId ([string]$PlanEntry.ActionId) `
-        -SourceFinding ([string]$PlanEntry.SourceFinding) `
-        -SourceName ([string]$PlanEntry.SourceName) `
-        -SourceType ([string]$PlanEntry.SourceType) `
+        -PlanId (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "PlanId") `
+        -PreflightId $(if ($null -eq $PreflightResult) { "" } else {
+            Get-ToolkitFindingPropertyValue -Finding $PreflightResult -Name "PreflightId"
+        }) `
+        -ManifestId $(if ($null -eq $RollbackManifest) { "" } else {
+            Get-ToolkitFindingPropertyValue -Finding $RollbackManifest -Name "ManifestId"
+        }) `
+        -ActionId (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "ActionId") `
+        -SourceFinding (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceFinding") `
+        -SourceName (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceName") `
+        -SourceType (Get-ToolkitFindingPropertyValue -Finding $PlanEntry -Name "SourceType") `
         -OperationType $operationType `
-        -ExecutorId ([string]$ExecutionPolicy.executorId) `
+        -ExecutorId $(if ($null -eq $ExecutionPolicy) { "" } else {
+            [string]$ExecutionPolicy.ExecutorId
+        }) `
         -AttemptMode $AttemptMode `
         -Status $Status `
         -DecisionCode $DecisionCode `
         -Applied $Applied `
+        -MutationAttempted $MutationAttempted `
         -ShouldProcessApproved $ShouldProcessApproved `
         -PolicyAllowed ([bool]$Gate.PolicyAllowed) `
         -PreflightValid ([bool]$Gate.PreflightValid) `
         -ManifestValid ([bool]$Gate.ManifestValid) `
         -CurrentStateValid ([bool]$Gate.CurrentStateValid) `
         -ConfirmationProvided $ConfirmationProvided `
+        -ObservedStateAfter $ObservedStateAfter `
+        -RollbackRequired $RollbackRequired `
+        -RollbackStatus $RollbackStatus `
         -Reason $Reason `
         -Remediation $Remediation `
-        -BeforeStateHash ([string]$RollbackManifest.BeforeStateHash) `
-        -RollbackOperationType ([string]$ExecutionPolicy.rollbackOperationType) `
-        -RollbackTargetState ([string]$ExecutionPolicy.rollbackTargetState) `
+        -BeforeStateHash $(if ($null -eq $RollbackManifest) { "" } else {
+            Get-ToolkitFindingPropertyValue -Finding $RollbackManifest -Name "BeforeStateHash"
+        }) `
+        -RollbackOperationType $(if ($null -eq $ExecutionPolicy) { "" } else {
+            [string]$ExecutionPolicy.RollbackOperationType
+        }) `
+        -RollbackTargetState $(if ($null -eq $ExecutionPolicy) { "" } else {
+            [string]$ExecutionPolicy.RollbackTargetState
+        }) `
         -AttemptedAtUtc $attemptedAtUtc
 }
 
@@ -429,37 +767,94 @@ function Invoke-ToolkitOptimizationExecutor {
         [AllowEmptyCollection()][object[]]$PreflightResults,
         [AllowEmptyCollection()][object[]]$RollbackManifest,
         [switch]$Apply,
-        [switch]$Confirmed,
-        [object]$Rules = (Get-ToolkitOptimizationActionRules),
-        [object]$Environment = (Get-ToolkitPreflightEnvironment)
+        [switch]$Confirmed
     )
 
     $attemptMode = if ($Apply) { "Apply" } else { "DryRun" }
+    $seenActions = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
     $results = foreach ($planEntry in @($PlanEntries)) {
         if ($null -eq $planEntry) {
             continue
         }
 
-        $preflightResult = @(
+        $actionKey = "$($planEntry.PlanId)|$($planEntry.ActionId)"
+        if (-not $seenActions.Add($actionKey)) {
+            $duplicateGate = New-ToolkitDeniedExecutionGate `
+                -DecisionCode "DuplicatePlanAction" `
+                -Reason "The same plan action appears more than once in the execution request." `
+                -Remediation "Remove duplicate entries and regenerate the reports."
+            New-ToolkitExecutionAuditRecord `
+                -PlanEntry $planEntry `
+                -PreflightResult $null `
+                -RollbackManifest $null `
+                -ExecutionPolicy $null `
+                -Gate $duplicateGate `
+                -AttemptMode $attemptMode `
+                -Status "Denied" `
+                -DecisionCode $duplicateGate.DecisionCode `
+                -Applied $false `
+                -MutationAttempted $false `
+                -ShouldProcessApproved $false `
+                -ConfirmationProvided ([bool]$Confirmed) `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
+                -Reason $duplicateGate.Reason `
+                -Remediation $duplicateGate.Remediation
+            continue
+        }
+
+        $preflightMatches = @(
             $PreflightResults |
                 Where-Object {
-                    [string]$_.PlanId -eq [string]$planEntry.PlanId -and
-                    [string]$_.ActionId -eq [string]$planEntry.ActionId
+                    (Test-ToolkitExecutionStringEquals $_.PlanId $planEntry.PlanId) -and
+                    (Test-ToolkitExecutionStringEquals $_.ActionId $planEntry.ActionId)
                 }
-        ) | Select-Object -First 1
-        $manifestEntry = @(
+        )
+        $manifestMatches = @(
             $RollbackManifest |
                 Where-Object {
-                    [string]$_.PlanId -eq [string]$planEntry.PlanId -and
-                    [string]$_.ActionId -eq [string]$planEntry.ActionId
+                    (Test-ToolkitExecutionStringEquals $_.PlanId $planEntry.PlanId) -and
+                    (Test-ToolkitExecutionStringEquals $_.ActionId $planEntry.ActionId)
                 }
-        ) | Select-Object -First 1
+        )
+
+        if ($preflightMatches.Count -gt 1 -or $manifestMatches.Count -gt 1) {
+            $ambiguousGate = New-ToolkitDeniedExecutionGate `
+                -DecisionCode "AmbiguousExecutionArtifacts" `
+                -Reason "Multiple preflight or rollback records match the same plan action." `
+                -Remediation "Discard the ambiguous reports and regenerate the optimizer artifacts."
+            New-ToolkitExecutionAuditRecord `
+                -PlanEntry $planEntry `
+                -PreflightResult ($preflightMatches | Select-Object -First 1) `
+                -RollbackManifest ($manifestMatches | Select-Object -First 1) `
+                -ExecutionPolicy $null `
+                -Gate $ambiguousGate `
+                -AttemptMode $attemptMode `
+                -Status "Denied" `
+                -DecisionCode $ambiguousGate.DecisionCode `
+                -Applied $false `
+                -MutationAttempted $false `
+                -ShouldProcessApproved $false `
+                -ConfirmationProvided ([bool]$Confirmed) `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
+                -Reason $ambiguousGate.Reason `
+                -Remediation $ambiguousGate.Remediation
+            continue
+        }
+
+        $preflightResult = $preflightMatches | Select-Object -First 1
+        $manifestEntry = $manifestMatches | Select-Object -First 1
+        $rules = Get-ToolkitOptimizationActionRules
+        $environment = Get-ToolkitPreflightEnvironment
         $gate = Test-ToolkitOptimizationExecutionGate `
             -PlanEntry $planEntry `
             -PreflightResult $preflightResult `
             -RollbackManifest $manifestEntry `
-            -Rules $Rules `
-            -Environment $Environment
+            -Rules $rules `
+            -Environment $environment
         $policy = $gate.ExecutionPolicy
 
         if (-not $gate.Allowed) {
@@ -473,8 +868,11 @@ function Invoke-ToolkitOptimizationExecutor {
                 -Status "Denied" `
                 -DecisionCode $gate.DecisionCode `
                 -Applied $false `
+                -MutationAttempted $false `
                 -ShouldProcessApproved $false `
                 -ConfirmationProvided ([bool]$Confirmed) `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
                 -Reason $gate.Reason `
                 -Remediation $gate.Remediation
             continue
@@ -491,8 +889,11 @@ function Invoke-ToolkitOptimizationExecutor {
                 -Status "Preview" `
                 -DecisionCode "ApplyRequired" `
                 -Applied $false `
+                -MutationAttempted $false `
                 -ShouldProcessApproved $false `
                 -ConfirmationProvided ([bool]$Confirmed) `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
                 -Reason "Dry-run preview only; -Apply was not specified." `
                 -Remediation "Review the audit record and use explicit Apply and confirmation only when ready."
             continue
@@ -509,15 +910,18 @@ function Invoke-ToolkitOptimizationExecutor {
                 -Status "Denied" `
                 -DecisionCode "ConfirmationMissing" `
                 -Applied $false `
+                -MutationAttempted $false `
                 -ShouldProcessApproved $false `
                 -ConfirmationProvided $false `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
                 -Reason "Apply was requested without explicit executor confirmation." `
                 -Remediation "Review the plan and provide explicit confirmation before retrying."
             continue
         }
 
-        $target = [string]$planEntry.SourceFinding
-        $action = "$($policy.executorId) -> $($policy.targetState)"
+        $target = "$($planEntry.Source)$($planEntry.SourceName)"
+        $action = "$($policy.ExecutorId) -> $($policy.TargetState)"
         $shouldProcessApproved = $PSCmdlet.ShouldProcess($target, $action)
 
         if (-not $shouldProcessApproved) {
@@ -539,51 +943,173 @@ function Invoke-ToolkitOptimizationExecutor {
                 -Status $status `
                 -DecisionCode $decisionCode `
                 -Applied $false `
+                -MutationAttempted $false `
                 -ShouldProcessApproved $false `
                 -ConfirmationProvided $true `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
                 -Reason "PowerShell ShouldProcess did not approve the operation." `
                 -Remediation "Review WhatIf output or rerun and approve the confirmation prompt."
             continue
         }
 
+        $finalRules = Get-ToolkitOptimizationActionRules
+        $finalEnvironment = Get-ToolkitPreflightEnvironment
+        $finalGate = Test-ToolkitOptimizationExecutionGate `
+            -PlanEntry $planEntry `
+            -PreflightResult $preflightResult `
+            -RollbackManifest $manifestEntry `
+            -Rules $finalRules `
+            -Environment $finalEnvironment
+
+        if (-not $finalGate.Allowed) {
+            New-ToolkitExecutionAuditRecord `
+                -PlanEntry $planEntry `
+                -PreflightResult $preflightResult `
+                -RollbackManifest $manifestEntry `
+                -ExecutionPolicy $finalGate.ExecutionPolicy `
+                -Gate $finalGate `
+                -AttemptMode $attemptMode `
+                -Status "Denied" `
+                -DecisionCode "FinalValidationFailed" `
+                -Applied $false `
+                -MutationAttempted $false `
+                -ShouldProcessApproved $true `
+                -ConfirmationProvided $true `
+                -RollbackRequired $false `
+                -RollbackStatus "Not Required" `
+                -Reason "Final validation failed after confirmation: $($finalGate.DecisionCode). $($finalGate.Reason)" `
+                -Remediation "Do not retry until the drift or safety-policy failure is reviewed."
+            continue
+        }
+
+        $policy = $finalGate.ExecutionPolicy
+        $taskName = [string]$manifestEntry.TargetIdentity
+        $taskPath = [string]$planEntry.Source
         try {
             Invoke-ToolkitAllowedExecutionOperation `
-                -PlanEntry $planEntry `
-                -RollbackManifest $manifestEntry `
-                -ExecutionPolicy $policy
+                -TaskName $taskName `
+                -TaskPath $taskPath `
+                -ExecutorId $policy.ExecutorId
+
+            try {
+                $postObject = Get-ToolkitExecutorCurrentObject `
+                    -PlanEntry $planEntry `
+                    -RollbackManifest $manifestEntry `
+                    -ExecutionPolicy $policy
+                $observedState = [string]$postObject.State
+            }
+            catch {
+                $observedState = ""
+                throw "The operation returned, but post-state validation failed: $($_.Exception.Message)"
+            }
+
+            if (-not (Test-ToolkitExecutionStringEquals $observedState $policy.TargetState)) {
+                $rollbackRequired = -not (
+                    Test-ToolkitExecutionStringEquals `
+                        $observedState `
+                        $planEntry.CurrentState
+                )
+                New-ToolkitExecutionAuditRecord `
+                    -PlanEntry $planEntry `
+                    -PreflightResult $preflightResult `
+                    -RollbackManifest $manifestEntry `
+                    -ExecutionPolicy $policy `
+                    -Gate $finalGate `
+                    -AttemptMode $attemptMode `
+                    -Status $(if ($rollbackRequired) { "Indeterminate" } else { "Failed" }) `
+                    -DecisionCode "PostStateMismatch" `
+                    -Applied $false `
+                    -MutationAttempted $true `
+                    -ShouldProcessApproved $true `
+                    -ConfirmationProvided $true `
+                    -ObservedStateAfter $observedState `
+                    -RollbackRequired $rollbackRequired `
+                    -RollbackStatus $(if ($rollbackRequired) { "Required - Not Executed" } else { "Not Required" }) `
+                    -Reason "The operation returned without reaching the allowlisted target state." `
+                    -Remediation "Review the live state and rollback manifest before any retry."
+                continue
+            }
 
             New-ToolkitExecutionAuditRecord `
                 -PlanEntry $planEntry `
                 -PreflightResult $preflightResult `
                 -RollbackManifest $manifestEntry `
                 -ExecutionPolicy $policy `
-                -Gate $gate `
+                -Gate $finalGate `
                 -AttemptMode $attemptMode `
                 -Status "Executed" `
                 -DecisionCode "Executed" `
                 -Applied $true `
+                -MutationAttempted $true `
                 -ShouldProcessApproved $true `
                 -ConfirmationProvided $true `
-                -Reason "The allowlisted operation completed successfully." `
+                -ObservedStateAfter $observedState `
+                -RollbackRequired $false `
+                -RollbackStatus "Available" `
+                -Reason "The allowlisted operation completed and the target state was verified." `
                 -Remediation "Retain the rollback manifest and execution audit record."
         }
         catch {
+            $executionError = $_.Exception.Message
+            $observedState = ""
+            $applied = $false
+            $rollbackRequired = $true
+            $status = "Indeterminate"
+            $decisionCode = "ExecutionOutcomeIndeterminate"
+
+            try {
+                $failureObject = Get-ToolkitExecutorCurrentObject `
+                    -PlanEntry $planEntry `
+                    -RollbackManifest $manifestEntry `
+                    -ExecutionPolicy $policy
+                $observedState = [string]$failureObject.State
+
+                if (Test-ToolkitExecutionStringEquals $observedState $policy.TargetState) {
+                    $applied = $true
+                    $status = "FailedAfterStateChange"
+                    $decisionCode = "ExecutionFailedAfterStateChange"
+                }
+                elseif (
+                    Test-ToolkitExecutionStringEquals `
+                        $observedState `
+                        $planEntry.CurrentState
+                ) {
+                    $rollbackRequired = $false
+                    $status = "Failed"
+                    $decisionCode = "ExecutionFailedNoStateChange"
+                }
+            }
+            catch {
+                $executionError = "$executionError Post-failure state validation also failed: $($_.Exception.Message)"
+            }
+
             New-ToolkitExecutionAuditRecord `
                 -PlanEntry $planEntry `
                 -PreflightResult $preflightResult `
                 -RollbackManifest $manifestEntry `
                 -ExecutionPolicy $policy `
-                -Gate $gate `
+                -Gate $finalGate `
                 -AttemptMode $attemptMode `
-                -Status "Failed" `
-                -DecisionCode "ExecutionFailed" `
-                -Applied $false `
+                -Status $status `
+                -DecisionCode $decisionCode `
+                -Applied $applied `
+                -MutationAttempted $true `
                 -ShouldProcessApproved $true `
                 -ConfirmationProvided $true `
-                -Reason "Execution failed: $($_.Exception.Message)" `
-                -Remediation "Do not retry until the failure is reviewed against the rollback manifest."
+                -ObservedStateAfter $observedState `
+                -RollbackRequired $rollbackRequired `
+                -RollbackStatus $(if ($rollbackRequired) { "Required - Not Executed" } else { "Not Required" }) `
+                -Reason "Execution failed: $executionError" `
+                -Remediation $(if ($rollbackRequired) {
+                    "Treat the outcome as changed or unknown and review the rollback manifest before any retry."
+                } else {
+                    "The before-state was verified; review the failure before retrying."
+                })
         }
     }
 
     return @($results)
 }
+
+Export-ModuleMember -Function Invoke-ToolkitOptimizationExecutor

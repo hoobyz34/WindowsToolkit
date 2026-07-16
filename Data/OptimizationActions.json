@@ -201,6 +201,19 @@
         "Ready",
         "Disabled"
       ],
+      "allowedTaskPathPrefixes": [
+        "\\HP\\"
+      ],
+      "allowedTaskNamePatterns": [
+        "HP Insights",
+        "HP Analytics",
+        "HP Touchpoint",
+        "Telemetry"
+      ],
+      "allowedTaskAuthorPatterns": [
+        "HP",
+        "Hewlett-Packard"
+      ],
       "executorId": "DisableScheduledTask",
       "targetState": "Disabled",
       "mutatingCommand": "Disable-ScheduledTask",

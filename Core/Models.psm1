@@ -198,12 +198,16 @@ function New-ToolkitOptimizationExecutionResult {
         [Parameter(Mandatory)][string]$Status,
         [Parameter(Mandatory)][string]$DecisionCode,
         [Parameter(Mandatory)][bool]$Applied,
+        [Parameter(Mandatory)][bool]$MutationAttempted,
         [Parameter(Mandatory)][bool]$ShouldProcessApproved,
         [Parameter(Mandatory)][bool]$PolicyAllowed,
         [Parameter(Mandatory)][bool]$PreflightValid,
         [Parameter(Mandatory)][bool]$ManifestValid,
         [Parameter(Mandatory)][bool]$CurrentStateValid,
         [Parameter(Mandatory)][bool]$ConfirmationProvided,
+        [string]$ObservedStateAfter = "",
+        [Parameter(Mandatory)][bool]$RollbackRequired,
+        [Parameter(Mandatory)][string]$RollbackStatus,
         [Parameter(Mandatory)][string]$Reason,
         [Parameter(Mandatory)][string]$Remediation,
         [string]$BeforeStateHash = "",
@@ -227,12 +231,16 @@ function New-ToolkitOptimizationExecutionResult {
         Status                  = $Status
         DecisionCode            = $DecisionCode
         Applied                 = $Applied
+        MutationAttempted       = $MutationAttempted
         ShouldProcessApproved   = $ShouldProcessApproved
         PolicyAllowed           = $PolicyAllowed
         PreflightValid          = $PreflightValid
         ManifestValid           = $ManifestValid
         CurrentStateValid       = $CurrentStateValid
         ConfirmationProvided    = $ConfirmationProvided
+        ObservedStateAfter      = $ObservedStateAfter
+        RollbackRequired        = $RollbackRequired
+        RollbackStatus          = $RollbackStatus
         Reason                  = $Reason
         Remediation             = $Remediation
         BeforeStateHash         = $BeforeStateHash

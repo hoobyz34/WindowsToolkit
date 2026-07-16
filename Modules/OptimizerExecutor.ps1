@@ -34,14 +34,12 @@ $rollbackManifest = @(
     Get-Content -Path $rollbackPath -Raw |
         ConvertFrom-Json -ErrorAction Stop
 )
-$environment = Get-ToolkitPreflightEnvironment
 $executionParameters = @{
     PlanEntries     = $plan
     PreflightResults = $preflight
     RollbackManifest = $rollbackManifest
     Apply           = $Apply
     Confirmed       = $Confirmed
-    Environment     = $environment
 }
 
 if ($WhatIfPreference) {

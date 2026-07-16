@@ -214,6 +214,35 @@ function Save-ToolkitRollbackManifestReports {
         -Columns $columns
 }
 
+function ConvertTo-ToolkitCsvSafeData {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]]$Data
+    )
+
+    return @(
+        foreach ($item in @($Data)) {
+            $safeItem = [ordered]@{}
+
+            foreach ($property in $item.PSObject.Properties) {
+                $value = $property.Value
+                if (
+                    $value -is [string] -and
+                    $value -match "^[\x00-\x20]*[=+\-@]"
+                ) {
+                    $value = "'$value"
+                }
+
+                $safeItem[$property.Name] = $value
+            }
+
+            [PSCustomObject]$safeItem
+        }
+    )
+}
+
 function Save-ToolkitOptimizationExecutionReports {
     [CmdletBinding()]
     param(
@@ -226,15 +255,28 @@ function Save-ToolkitOptimizationExecutionReports {
         "ExecutionId", "PlanId", "PreflightId", "ManifestId", "ActionId",
         "SourceFinding", "SourceName", "SourceType", "OperationType",
         "ExecutorId", "AttemptMode", "Status", "DecisionCode", "Applied",
-        "ShouldProcessApproved", "PolicyAllowed", "PreflightValid",
-        "ManifestValid", "CurrentStateValid", "ConfirmationProvided",
-        "Reason", "Remediation", "BeforeStateHash", "RollbackOperationType",
-        "RollbackTargetState", "AttemptedAtUtc"
+        "MutationAttempted", "ShouldProcessApproved", "PolicyAllowed",
+        "PreflightValid", "ManifestValid", "CurrentStateValid",
+        "ConfirmationProvided", "ObservedStateAfter", "RollbackRequired",
+        "RollbackStatus", "Reason", "Remediation", "BeforeStateHash",
+        "RollbackOperationType", "RollbackTargetState", "AttemptedAtUtc"
     )
+
+    if ($ExecutionResults.Count -gt 0) {
+        return [PSCustomObject]@{
+            CsvPath = Save-CsvReport `
+                -Name "Optimization_Execution" `
+                -Data (ConvertTo-ToolkitCsvSafeData -Data $ExecutionResults)
+            JsonPath = Save-JsonReport `
+                -Name "Optimization_Execution" `
+                -Data $ExecutionResults `
+                -Depth 10
+        }
+    }
 
     return Save-ToolkitStructuredReports `
         -Name "Optimization_Execution" `
-        -Data $ExecutionResults `
+        -Data @() `
         -Columns $columns
 }
 
