@@ -2,15 +2,15 @@
 
 ## Release
 
-v0.7.0
+v0.7.1
 
 ## Goal
 
-Add and harden the exact-identity HP Insights Analytics service capability on top of the gated Safe Optimizer executor.
+Normalize exact-service rollback metadata while preserving every Safe Optimizer identity and safety gate.
 
 ## Release Status
 
-Exact-identity HP Insights Analytics service capability and security hardening complete.
+Service rollback metadata normalization and v0.7 artifact compatibility complete.
 
 ## Active Tasks
 
@@ -20,6 +20,8 @@ Exact-identity HP Insights Analytics service capability and security hardening c
 - [x] Current preflight, live-state, and rollback-manifest validation
 - [x] Standardized execution and rollback audit reporting
 - [x] Deny-by-default artifact, policy, scope, and live-state hardening
+- [x] Canonical delayed-start metadata comparison and hashing
+- [x] Existing v0.7 execution and rollback-manifest compatibility
 
 ## Blockers
 
@@ -27,7 +29,7 @@ None
 
 ## Release Commit
 
-Finalize HP service optimizer release
+Release v0.7.1
 
 ## Definition of Done
 
@@ -41,6 +43,8 @@ Protected, unsupported, stale, blocked, non-reversible, unsafe-dependency, ident
 
 Every attempt produces CSV and JSON execution/rollback audit records with immutable before-state and rollback metadata. Rollback restores the captured startup, running, recovery, and delayed-start state, then verifies dependencies and exact service identity metadata.
 
+Semantically equivalent disabled delayed-start representations are canonicalized for comparison and hashing. Existing v0.7 artifacts validate when every immutable safety field matches, and their gated rollback is available without weakening meaningful drift detection.
+
 Git tag:
 
-v0.7.0
+v0.7.1

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.1
+
+### Fixed
+
+- Normalized semantically equivalent disabled service metadata so absent, null, false, and zero delayed-start representations compare and hash consistently without weakening meaningful drift detection.
+- Existing v0.7 HP Insights Analytics execution and rollback-manifest artifacts now validate correctly, making the preserved rollback available through the gated executor.
+
 ## v0.7.0
 
 ### Added

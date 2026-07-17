@@ -14,7 +14,7 @@ WindowsToolkit is a modular Windows auditing and optimization platform focused o
 
 # Current Version
 
-v0.7.0
+v0.7.1
 
 ---
 
@@ -40,12 +40,13 @@ v0.7.0
 - [x] Safe Optimizer executor security hardening
 - [x] Exact-identity HP Insights Analytics service optimization capability
 - [x] HP service identity, dependency, recovery, rollback, and live-state hardening
+- [x] Service rollback metadata normalization and v0.7 artifact compatibility
 
 ---
 
 # Current Sprint
 
-v0.7.0 Exact-identity HP Insights Analytics service capability and security hardening complete.
+v0.7.1 Service rollback metadata normalization and existing v0.7 artifact compatibility complete.
 
 ---
 
